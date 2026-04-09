@@ -5,7 +5,7 @@
 //  Created by Yanan Li on 2025/12/20.
 //
 
-import AVFoundation
+@preconcurrency import AVFoundation
 import Foundation
 import Combine
 import SwiftUI
@@ -17,9 +17,10 @@ public final class CameraCoordinator: NSObject, Logging {
     /// The ``Camera`` instance.
     @MainActor weak var camera: Camera!
     /// The capture preview.
-    nonisolated let cameraPreview = CameraPreview()
-    
-    nonisolated internal init(configuration: CameraCaptureProfile) {
+    nonisolated let cameraPreview: CameraPreview
+
+    @MainActor internal init(configuration: CameraCaptureProfile) {
+        self.cameraPreview = CameraPreview()
         self.profile = configuration
         super.init()
     }
@@ -95,11 +96,13 @@ public final class CameraCoordinator: NSObject, Logging {
                 guard let self else { return }
                 
                 withAnimation(sessionIsRunning ? .easeInOut(duration: 0.15) : nil) {
-                    self.camera?.previewDimming = true
+                    self.camera?.state.previewDimming = true
                 } completion: {
                     self.cameraPreview.freezePreview(false)
                     withAnimation(.easeInOut(duration: 0.15)) {
-                        self.camera?.previewDimming = false
+                        self.camera?.state.previewDimming = false
+                    }
+                    Task { @CameraActor in
                         self.setConfigurationState(false)
                     }
                 }
@@ -137,7 +140,7 @@ public final class CameraCoordinator: NSObject, Logging {
             let wideAngleCameraZoomFactor = self.wideAngleCameraZoomFactor
             displayZoomFactorMultiplier = wideAngleCameraZoomFactor
             updateCamera { camera in
-                camera.displayZoomFactorMultiplier = 1 / wideAngleCameraZoomFactor
+                camera.state.displayZoomFactorMultiplier = 1 / wideAngleCameraZoomFactor
             }
         }
         #if os(iOS)
@@ -150,7 +153,7 @@ public final class CameraCoordinator: NSObject, Logging {
         #endif
         
         updateCamera { camera in
-            camera.flash.deviceEligible = device.hasFlash
+            camera.state.flash.deviceEligible = device.hasFlash
         }
     }
     
@@ -253,7 +256,7 @@ public final class CameraCoordinator: NSObject, Logging {
             cancellables: &zoomInformationObservers
         ) { [weak self] displayVideoZoomFactorMultiplier in
             self?.updateCamera { camera in
-                camera.displayZoomFactorMultiplier = displayVideoZoomFactorMultiplier
+                camera.state.displayZoomFactorMultiplier = displayVideoZoomFactorMultiplier
             }
         }
         
@@ -271,8 +274,8 @@ public final class CameraCoordinator: NSObject, Logging {
         ) { [weak self] videoZoomFactor in
             guard let self else { return }
             guard !self.isSettingZoomFactor else { return }
-            self.updateCamera { @MainActor camera in
-                camera.zoomFactor = videoZoomFactor
+            self.updateCamera { camera in
+                camera.state.zoomFactor = videoZoomFactor
             }
         }
     }
@@ -364,31 +367,32 @@ public final class CameraCoordinator: NSObject, Logging {
     nonisolated private func observeRotationCoordinator() {
         guard let rotationCoordinator else { return }
         $rotationObservers.cancelAll()
-        
+
         withValueObservation(
             of: rotationCoordinator,
             keyPath: \.videoRotationAngleForHorizonLevelCapture,
             cancellables: &$rotationObservers.wrappedValue // Swift does not support `nonisolated(unsafe)` directly on properties with property wrappers
         ) { [weak self] angle in
-            Task { @CameraActor in
-                guard let self else { return }
+            guard let self else { return }
+            Task { @CameraActor [self] in
                 for output in self.activeOutputs {
                     output.connection(with: .video)?.videoRotationAngle = angle
                 }
             }
-            self?.updateCamera {
-                $0.captureRotationAngle = angle
+            self.updateCamera {
+                $0.state.captureRotationAngle = angle
             }
         }
-        
+
         withValueObservation(
             of: rotationCoordinator,
             keyPath: \.videoRotationAngleForHorizonLevelPreview,
             cancellables: &$rotationObservers.wrappedValue // Swift does not support `nonisolated(unsafe)` directly on properties with property wrappers
         ) { [weak self] angle in
-            self?.updateCamera { @MainActor camera in
-                camera.previewRotationAngle = angle
-                self?.cameraPreview.preview.videoPreviewLayer.connection?.videoRotationAngle = angle
+            guard let self else { return }
+            self.updateCamera { camera in
+                camera.state.previewRotationAngle = angle
+                self.cameraPreview.preview.videoPreviewLayer.connection?.videoRotationAngle = angle
             }
         }
     }
@@ -413,24 +417,25 @@ public final class CameraCoordinator: NSObject, Logging {
 
 extension CameraCoordinator {
     nonisolated private func updateCamera(
-        perform action: @escaping (Camera) async -> Void
+        perform action: @MainActor @Sendable @escaping (Camera) -> Void
     ) {
         Task { @MainActor [weak self] in
             guard let self else { return }
             precondition(self.camera != nil, "Camera is not available.")
-            await action(self.camera)
+            action(self.camera)
         }
     }
-    
-    nonisolated private func setConfigurationState(_ isConfiguring: Bool) {
+
+    private func setConfigurationState(_ isConfiguring: Bool) {
+        let sessionIsRunning = captureSession.isRunning
         updateCamera { camera in
-            let currentState = camera.captureSessionState
-            
+            let currentState = camera.state.captureSessionState
+
             switch (currentState, isConfiguring) {
                 case (.running, true):
-                    camera.captureSessionState = .configuring
+                    camera.state.captureSessionState = .configuring
                 case (.configuring, false):
-                    camera.captureSessionState = await self.captureSession.isRunning ? .running : .idle
+                    camera.state.captureSessionState = sessionIsRunning ? .running : .idle
                 default:
                     break
             }

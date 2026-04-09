@@ -72,7 +72,7 @@ public struct CameraZoomProxy {
 // MARK: - Animatable Modifier
 
 @available(macOS, unavailable)
-fileprivate struct _CameraZoomModifier: ViewModifier, Animatable {
+fileprivate struct _CameraZoomModifier: ViewModifier, @MainActor Animatable {
     let camera: Camera
     var nextZoomFactor: CGFloat
     

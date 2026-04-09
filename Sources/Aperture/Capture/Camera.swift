@@ -6,15 +6,16 @@
 //
 
 import Foundation
-import AVFoundation
+@preconcurrency import AVFoundation
 import OSLog
 import Observation
 import Combine
 
 /// An observable camera instance camera feed, photo capturing, and more.
 @Observable
+@MainActor
 @dynamicMemberLookup
-public final class Camera: SendableMetatype, Logging {
+public final class Camera: Logging {
     /// A camera coordinator that consists of camera IO, session, rotation coordinator, etc.
     let coordinator: CameraCoordinator
 
@@ -70,11 +71,12 @@ public final class Camera: SendableMetatype, Logging {
         let coordinator = CameraCoordinator(configuration: profile)
         self.coordinator = coordinator
         defer {
+            let captureDevice = device.captureDevice
             Task { @CameraActor in
                 await MainActor.run {
                     self.coordinator.camera = self
                 }
-                coordinator.cameraInputDevice = device.captureDevice
+                coordinator.cameraInputDevice = captureDevice
             }
         }
         
@@ -178,13 +180,14 @@ extension Camera {
 // MARK: - Auxiliary
 
 fileprivate extension Camera {
-    final class AutomaticCameraObserver: NSObject {
+    final class AutomaticCameraObserver: NSObject, @unchecked Sendable {
         unowned let camera: Camera
-        
+
+        @MainActor
         public init(camera: Camera) {
             self.camera = camera
             super.init()
-            
+
             AVCaptureDevice.self.addObserver(
                 self,
                 forKeyPath: "systemPreferredCamera",
@@ -198,7 +201,7 @@ fileprivate extension Camera {
                 context: nil
             )
         }
-        
+
         public override func observeValue(
             forKeyPath keyPath: String?,
             of object: Any?,
@@ -207,18 +210,24 @@ fileprivate extension Camera {
         ) {
             switch keyPath {
                 case "systemPreferredCamera":
-                    guard let automaticCamera = camera.device as? AutomaticCamera,
-                          automaticCamera.preference == .systemPreferred
-                    else { return }
-                    Task { @CameraActor in
-                        camera.coordinator.cameraInputDevice = (change?[.newKey] as? AVCaptureDevice) ?? BuiltInCamera().captureDevice
+                    let newDevice = (change?[.newKey] as? AVCaptureDevice) ?? BuiltInCamera().captureDevice
+                    Task { @MainActor [camera] in
+                        guard let automaticCamera = camera.device as? AutomaticCamera,
+                              automaticCamera.preference == .systemPreferred
+                        else { return }
+                        Task { @CameraActor in
+                            camera.coordinator.cameraInputDevice = newDevice
+                        }
                     }
                 case "userPreferredCamera":
-                    guard let automaticCamera = camera.device as? AutomaticCamera,
-                          automaticCamera.preference == .userPreferred
-                    else { return }
-                    Task { @CameraActor in
-                        camera.coordinator.cameraInputDevice = (change?[.newKey] as? AVCaptureDevice) ?? BuiltInCamera().captureDevice
+                    let newDevice = (change?[.newKey] as? AVCaptureDevice) ?? BuiltInCamera().captureDevice
+                    Task { @MainActor [camera] in
+                        guard let automaticCamera = camera.device as? AutomaticCamera,
+                              automaticCamera.preference == .userPreferred
+                        else { return }
+                        Task { @CameraActor in
+                            camera.coordinator.cameraInputDevice = newDevice
+                        }
                     }
                 default:
                     super.observeValue(

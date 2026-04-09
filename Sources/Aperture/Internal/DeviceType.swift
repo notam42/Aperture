@@ -25,7 +25,7 @@ extension ProcessInfo {
 }
 
 /// Device type enum that represent the device users are currently using.
-package enum DeviceType: Int, @unchecked Sendable {
+package enum DeviceType: Int, Sendable {
     /// Devices running iOS, typically iPhone and iPod.
     case phone
     /// Devices running iPadOS.

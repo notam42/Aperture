@@ -5,7 +5,7 @@
 //  Created by Yanan Li on 2025/12/31.
 //
 
-import AVFoundation
+@preconcurrency import AVFoundation
 
 /// A built-in camera that consists of multiple available lens (if available), or single wide angle camera.
 public struct BuiltInCamera: SemanticCamera {

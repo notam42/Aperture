@@ -108,7 +108,7 @@ extension CameraViewFinder {
                 .preview
                 .videoPreviewLayer
                 .captureDevicePointConverted(fromLayerPoint: point)
-            Task { @CameraActor in
+            Task { @MainActor in
                 camera.setManualFocus(
                     pointOfInterest: pointOfInterest,
                     focusMode: .autoFocus,
@@ -124,7 +124,7 @@ extension CameraViewFinder {
                 .preview
                 .videoPreviewLayer
                 .captureDevicePointConverted(fromLayerPoint: point)
-            Task { @CameraActor in
+            Task { @MainActor in
                 camera.setManualFocus(
                     pointOfInterest: pointOfInterest,
                     focusMode: .locked,

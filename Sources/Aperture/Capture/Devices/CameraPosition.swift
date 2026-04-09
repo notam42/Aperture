@@ -5,7 +5,7 @@
 //  Created by Yanan Li on 2025/5/9.
 //
 
-import AVFoundation
+@preconcurrency import AVFoundation
 
 /// Constants that indicate the physical position of a capture device.
 public enum CameraPosition: Int, Sendable, Hashable, CustomStringConvertible {

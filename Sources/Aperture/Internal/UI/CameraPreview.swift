@@ -6,10 +6,15 @@
 //
 
 import SwiftUI
-import AVFoundation
+@preconcurrency import AVFoundation
 
-struct CameraPreview {
-    let preview = _PlatformViewBackedPreview()
+struct CameraPreview: Sendable {
+    let preview: _PlatformViewBackedPreview
+
+    @MainActor
+    init() {
+        self.preview = _PlatformViewBackedPreview()
+    }
     
     @MainActor
     var layer: AVCaptureVideoPreviewLayer {

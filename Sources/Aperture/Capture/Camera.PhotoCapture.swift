@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import AVFoundation
+@preconcurrency import AVFoundation
 
 extension Camera {
     /// Takes a photo of current scene.
@@ -14,18 +14,23 @@ extension Camera {
         configuration: PhotoCaptureConfiguration,
         dataRepresentationCustomizer: (any PhotoFileDataRepresentationCustomizer)? = nil
     ) async throws -> CapturedPhoto {
-        let context = await coordinator.outputContext(for: PhotoCaptureService.self)
-        guard let context else { throw CaptureError.noContext }
-        
-        let photoOutput = await coordinator.captureOutput(of: PhotoCaptureService.self)
-        let service = profile.photoCaptureService
-        guard let photoOutput, let service else { throw CaptureError.photoOutputServiceNotAvailable }
-        
-        let photoSettings = try await service.createPhotoSettings(
-            output: photoOutput,
-            configuration: configuration,
-            context: context
-        )
+        let service = await profile.photoCaptureService
+
+        let (photoOutput, photoSettings) = try await { @CameraActor in
+            let context = coordinator.outputContext(for: PhotoCaptureService.self)
+            guard let context else { throw CaptureError.noContext }
+
+            let photoOutput = coordinator.captureOutput(of: PhotoCaptureService.self)
+            guard let photoOutput, let service else { throw CaptureError.photoOutputServiceNotAvailable }
+
+            let photoSettings = try await service.createPhotoSettings(
+                output: photoOutput,
+                configuration: configuration,
+                context: context
+            )
+            return (photoOutput, photoSettings)
+        }()
+
         let capturedPhoto = try await withPhotoOutputReadinessCoordinatorTracking(
             output: photoOutput,
             photoSettings: photoSettings
@@ -36,18 +41,22 @@ extension Camera {
                     dataRepresentationCustomizer: dataRepresentationCustomizer,
                     continuation: continuation
                 )
-                inFlightPhotoCaptureDelegates[photoSettings.uniqueID] = delegate
+                Task { @MainActor in
+                    self.inFlightPhotoCaptureDelegates[photoSettings.uniqueID] = delegate
+                }
 
                 photoOutput.capturePhoto(with: photoSettings, delegate: delegate)
             }
         }
-        
-        inFlightPhotoCaptureDelegates[photoSettings.uniqueID] = nil
-        
+
+        Task { @MainActor in
+            self.inFlightPhotoCaptureDelegates[photoSettings.uniqueID] = nil
+        }
+
         return capturedPhoto
     }
     
-    private func withPhotoOutputReadinessCoordinatorTracking<T>(
+    nonisolated private func withPhotoOutputReadinessCoordinatorTracking<T>(
         output: AVCapturePhotoOutput,
         photoSettings: AVCapturePhotoSettings,
         perform action: () async throws -> T
@@ -55,12 +64,12 @@ extension Camera {
         var readinessCoordinator: AVCapturePhotoOutputReadinessCoordinator?
         #if os(iOS)
         readinessCoordinator = AVCapturePhotoOutputReadinessCoordinator(photoOutput: output)
-        
-        let delegate = PhotoReadinessCoordinatorDelegate(camera: self)
+
+        let delegate = await PhotoReadinessCoordinatorDelegate(camera: self)
         defer { _ = delegate }
         readinessCoordinator?.delegate = delegate
         #endif
-        
+
         readinessCoordinator?.startTrackingCaptureRequest(using: photoSettings)
         defer { readinessCoordinator?.stopTrackingCaptureRequest(using: photoSettings.uniqueID) }
         return try await action()
@@ -69,19 +78,22 @@ extension Camera {
 
 // MARK: - Delegate
 
-final class PhotoReadinessCoordinatorDelegate: NSObject, AVCapturePhotoOutputReadinessCoordinatorDelegate {
-    unowned var camera: Camera
-    
+final class PhotoReadinessCoordinatorDelegate: NSObject, AVCapturePhotoOutputReadinessCoordinatorDelegate, @unchecked Sendable {
+    unowned let camera: Camera
+
+    @MainActor
     init(camera: Camera) {
         self.camera = camera
     }
-    
+
     func readinessCoordinator(
         _ coordinator: AVCapturePhotoOutputReadinessCoordinator,
         captureReadinessDidChange captureReadiness: AVCapturePhotoOutput.CaptureReadiness
     ) {
-        camera.shutterDisabled = captureReadiness != .ready
-        camera.isBusyProcessing = captureReadiness == .notReadyWaitingForProcessing
+        Task { @MainActor in
+            camera.state.shutterDisabled = captureReadiness != .ready
+            camera.state.isBusyProcessing = captureReadiness == .notReadyWaitingForProcessing
+        }
     }
 }
 

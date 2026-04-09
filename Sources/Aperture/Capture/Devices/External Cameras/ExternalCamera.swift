@@ -5,7 +5,7 @@
 //  Created by Yanan Li on 2025/12/14.
 //
 
-import AVFoundation
+@preconcurrency import AVFoundation
 
 /// A camera device that represents an external camera source.
 public struct ExternalCamera: SemanticCamera {

@@ -5,7 +5,7 @@
 //  Created by Yanan Li on 2025/12/30.
 //
 
-import AVFoundation
+@preconcurrency import AVFoundation
 
 /// A camera device that represents a Desk View source.
 @available(iOS, unavailable)

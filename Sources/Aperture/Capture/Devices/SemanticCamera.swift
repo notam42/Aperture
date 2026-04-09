@@ -5,13 +5,13 @@
 //  Created by Yanan Li on 2025/12/14.
 //
 
-import AVFoundation
+@preconcurrency import AVFoundation
 import Foundation
 
 /// A type that describes a recognizable camera device.
 @_typeEraser(AnySemanticCamera)
 @dynamicMemberLookup
-public protocol SemanticCamera: Hashable {
+public protocol SemanticCamera: Hashable, Sendable {
     /// The underlying `AVCaptureDevice` used for capture, or `nil` when the device isn't available.
     var captureDevice: AVCaptureDevice? { get }
     /// The physical position of the camera, or `nil` if the device is not a built-in device.

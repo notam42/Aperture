@@ -5,7 +5,7 @@
 //  Created by Yanan Li on 2025/12/28.
 //
 
-import AVFoundation
+@preconcurrency import AVFoundation
 
 /// A built-in telephoto rear camera.
 @available(macOS, unavailable)

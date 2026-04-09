@@ -67,9 +67,10 @@ public struct CameraAccessoryContainer<LeadingAccessories: View, Content: View, 
     @State private var mainContentRect: CGRect?
 
     public var body: some View {
-        self.mainContent
+        let accessoryContainerNS = accessoryContainer
+        return self.mainContent
             .onGeometryChange(for: CGRect.self) { proxy in
-                proxy.frame(in: .named(accessoryContainer))
+                proxy.frame(in: .named(accessoryContainerNS))
             } action: { rect in
                 mainContentRect = rect
             }

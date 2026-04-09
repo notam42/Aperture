@@ -10,7 +10,8 @@ import AVFoundation
 
 extension Camera {
     @Observable
-    public final class State: SendableMetatype {
+    @MainActor
+    public final class State {
         unowned internal var camera: Camera!
         
         internal init(camera: Camera!) {
@@ -63,14 +64,23 @@ extension Camera {
         public var zoomFactor: CGFloat = 1.0 {
             didSet {
                 guard oldValue != self.zoomFactor else { return }
+                let updatedZoomFactor = self.zoomFactor
                 
-                Task { @CameraActor [zoomFactor] in
-                    camera.coordinator.isSettingZoomFactor = true
-                    defer { camera.coordinator.isSettingZoomFactor = false }
-                    
-                    camera.coordinator.withCurrentCaptureDevice { device in
-                        device.videoZoomFactor = zoomFactor
-                    }
+                Task { @MainActor [weak self] in
+                    self?.applyZoomFactor(updatedZoomFactor)
+                }
+            }
+        }
+        
+        private func applyZoomFactor(_ zoomFactor: CGFloat) {
+            guard let camera = self.camera else { return }
+            
+            Task { @CameraActor [camera] in
+                camera.coordinator.isSettingZoomFactor = true
+                defer { camera.coordinator.isSettingZoomFactor = false }
+                
+                camera.coordinator.withCurrentCaptureDevice { device in
+                    device.videoZoomFactor = zoomFactor
                 }
             }
         }

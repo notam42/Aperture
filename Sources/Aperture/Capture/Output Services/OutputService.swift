@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import AVFoundation
+@preconcurrency import AVFoundation
 
 /// A type that provides media output destinations for a capture session.
 public protocol OutputService: Equatable, Sendable {
@@ -33,7 +33,7 @@ extension OutputService where Coordinator == Void {
 // MARK: - Context
 
 /// Contextual information of the camera session and associated device input.
-public struct OutputServiceContext<Service: OutputService> {
+public struct OutputServiceContext<Service: OutputService>: @unchecked Sendable {
     /// The service associated coordinator.
     public var coordinator: Service.Coordinator
     /// The capture session.

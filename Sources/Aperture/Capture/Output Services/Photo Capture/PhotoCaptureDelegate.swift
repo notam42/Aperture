@@ -5,10 +5,10 @@
 //  Created by Yanan Li on 2025/12/15.
 //
 
-import AVFoundation
+@preconcurrency import AVFoundation
 import SwiftUI
 
-final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, Logging {
+final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, Logging, @unchecked Sendable {
     private var continuation: CheckedContinuation<CapturedPhoto, Error>
     private unowned var camera: Camera
     /// Optional customizer used to generate the encoded photo data.
@@ -37,15 +37,17 @@ final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, Loggi
         #if os(iOS)
         if !resolvedSettings.livePhotoMovieDimensions.isZero {
             Task { @MainActor in
-                camera.inProgressLivePhotoCount += 1
+                camera.state.inProgressLivePhotoCount += 1
             }
         }
         #endif
         
         // Fully dim the preview and show it back.
-        camera.previewDimming = true
-        withAnimation(.smooth(duration: 0.25)) {
-            camera.previewDimming = false
+        Task { @MainActor in
+            camera.state.previewDimming = true
+            withAnimation(.smooth(duration: 0.25)) {
+                camera.state.previewDimming = false
+            }
         }
     }
     
@@ -97,7 +99,7 @@ final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, Loggi
         resolvedSettings: AVCaptureResolvedPhotoSettings
     ) {
         Task { @MainActor in
-            camera.inProgressLivePhotoCount -= 1
+            camera.state.inProgressLivePhotoCount -= 1
         }
     }
     

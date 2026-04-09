@@ -51,7 +51,7 @@ extension CameraViewFinder {
         var rotation3DAngle: Double
         var scale: CGFloat
         
-        static var front = _FlipSide(rotation3DAngle: 0, scale: 1)
-        static var back = _FlipSide(rotation3DAngle: -180, scale: 1)
+        static let front = _FlipSide(rotation3DAngle: 0, scale: 1)
+        static let back = _FlipSide(rotation3DAngle: -180, scale: 1)
     }
 }

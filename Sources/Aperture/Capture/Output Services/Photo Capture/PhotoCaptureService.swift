@@ -95,13 +95,13 @@ public struct PhotoCaptureService: OutputService, Logging {
         #endif
     }
     
-    public final class Coordinator: FlashSceneRecommendationDelegate {
+    public final class Coordinator: FlashSceneRecommendationDelegate, @unchecked Sendable {
         weak var cameraCoordinator: CameraCoordinator!
         
         func setFlashScene(_ isFlashScene: Bool) {
             Task { @MainActor in
                 precondition(cameraCoordinator != nil, "CameraCoordinator must not equal to nil")
-                cameraCoordinator?.camera.flash.isFlashRecommendedByScene = isFlashScene
+                cameraCoordinator?.camera.state.flash.isFlashRecommendedByScene = isFlashScene
             }
         }
     }
@@ -163,7 +163,7 @@ extension PhotoCaptureService {
         photoSettings.isPortraitEffectsMatteDeliveryEnabled = output.isPortraitEffectsMatteDeliveryEnabled
         #endif
         
-        let flash = await context.coordinator.cameraCoordinator.camera.flash
+        let flash = await context.coordinator.cameraCoordinator.camera.state.flash
         if output.supportedFlashModes.contains(flash.userSelectedMode) {
             photoSettings.flashMode = flash.userSelectedMode
         }

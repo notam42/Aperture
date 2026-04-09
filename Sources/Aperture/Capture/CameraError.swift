@@ -31,7 +31,7 @@ public enum CaptureError: LocalizedError {
 public enum CameraError: LocalizedError {
     case invalidCaptureDevice
     case permissionDenied
-    case unsatisfiablePhotoCaptureConfiguration(key: PartialKeyPath<PhotoCaptureConfiguration>)
+    case unsatisfiablePhotoCaptureConfiguration(key: String)
     case sessionAlreadStarted
     case failedToAddOutput
     case failedToAddInput

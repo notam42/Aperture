@@ -10,7 +10,7 @@ import Foundation
 /// A singleton actor whose executor is equivalent to a dispatch serial queue.
 @globalActor
 public final actor CameraActor {
-    public static var shared = CameraActor()
+    public static let shared = CameraActor()
     
     private let sessionQueue = DispatchSerialQueue(
         label: "liyanan2004.Aperture.CameraActor",
