@@ -95,8 +95,8 @@ public struct CameraAccessoryContainer<LeadingAccessories: View, Content: View, 
                         vertical: proxy.secondaryLayoutStack.stack == .hstack ? .center : .top,
                     )
                     let trailingAnchor = Alignment(
-                        horizontal: proxy.secondaryLayoutStack.stack == .vstack ? .center : .trailing,
-                        vertical: proxy.secondaryLayoutStack.stack == .hstack ? .center : .bottom,
+                        horizontal: .center,
+                        vertical: .center,
                     )
                     let isRegularLayout = proxy.primaryLayoutStack.stack != .zstack
                     leadingAccessories
@@ -117,8 +117,8 @@ public struct CameraAccessoryContainer<LeadingAccessories: View, Content: View, 
                             isEnabled: isRegularLayout
                         )
                         .frame(
-                            minWidth: proxy.secondaryLayoutStack.order == .reversed ? topLeftSizeArea.width : nil,
-                            minHeight: proxy.secondaryLayoutStack.order == .reversed ? topLeftSizeArea.height : nil
+                            minWidth: topLeftSizeArea.width,
+                            minHeight: topLeftSizeArea.height
                         )
                 }
             }
