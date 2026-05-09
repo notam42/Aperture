@@ -157,6 +157,14 @@ extension PhotoCaptureService {
             configuration.qualityPrioritization,
             for: photoSettings
         )
+
+        #if os(iOS)
+        if #available(iOS 18.0, *) {
+            if output.isShutterSoundSuppressionSupported {
+                photoSettings.isShutterSoundSuppressionEnabled = true
+            }
+        }
+        #endif
         #if os(iOS)
         photoSettings.livePhotoMovieFileURL = configuration.capturesLivePhoto ? URL.movieFileURL : nil
         photoSettings.isDepthDataDeliveryEnabled = output.isDepthDataDeliveryEnabled
