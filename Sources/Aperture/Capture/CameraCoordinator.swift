@@ -362,6 +362,7 @@ public final class CameraCoordinator: NSObject, Logging {
     /// A set of observers that observe the properties of `rotationCoordinator`.
     @Cancellables private var rotationObservers
     /// A rotation coordinator that monitors physical orientation to ensure the level of preview and captured content is relative to gravity.
+    // nonisolated(unsafe): mutation and reads both occur on MainActor (inside setupRotationCoordinator's Task { @MainActor in … }); nonisolated(unsafe) is required because property wrappers and actor isolation don't compose.
     nonisolated(unsafe) private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     
     nonisolated private func observeRotationCoordinator() {

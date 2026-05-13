@@ -211,23 +211,21 @@ fileprivate extension Camera {
             switch keyPath {
                 case "systemPreferredCamera":
                     let newDevice = (change?[.newKey] as? AVCaptureDevice) ?? BuiltInCamera().captureDevice
-                    Task { @MainActor [camera] in
-                        guard let automaticCamera = camera.device as? AutomaticCamera,
-                              automaticCamera.preference == .systemPreferred
-                        else { return }
-                        Task { @CameraActor in
-                            camera.coordinator.cameraInputDevice = newDevice
+                    Task { @CameraActor [camera] in
+                        let shouldUpdate = await MainActor.run {
+                            (camera.device as? AutomaticCamera)?.preference == .systemPreferred
                         }
+                        guard shouldUpdate else { return }
+                        camera.coordinator.cameraInputDevice = newDevice
                     }
                 case "userPreferredCamera":
                     let newDevice = (change?[.newKey] as? AVCaptureDevice) ?? BuiltInCamera().captureDevice
-                    Task { @MainActor [camera] in
-                        guard let automaticCamera = camera.device as? AutomaticCamera,
-                              automaticCamera.preference == .userPreferred
-                        else { return }
-                        Task { @CameraActor in
-                            camera.coordinator.cameraInputDevice = newDevice
+                    Task { @CameraActor [camera] in
+                        let shouldUpdate = await MainActor.run {
+                            (camera.device as? AutomaticCamera)?.preference == .userPreferred
                         }
+                        guard shouldUpdate else { return }
+                        camera.coordinator.cameraInputDevice = newDevice
                     }
                 default:
                     super.observeValue(
