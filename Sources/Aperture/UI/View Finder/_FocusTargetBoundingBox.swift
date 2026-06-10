@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AVFoundation
+import Combine
 
 @available(macOS, unavailable)
 struct _FocusTargetBoundingBox: View {
@@ -198,38 +199,25 @@ struct _FocusTargetBoundingBox: View {
     
     @Sendable private func trackFocusState() async {
         defer { updateFocusIndicator() }
-        
+
         guard let device = camera.device.captureDevice else { return }
-        
-        var lensPosition = device.lensPosition
-        let timeout = 1000 // Timeout for stopping finding a focus if we cannot
-        var waitingTime = 0 // Time(ms) elapse since now based on `Task.sleep`
-       
-        // Determine whether the camera is now focusing
-        while device.lensPosition == lensPosition {
+
+        let focusStates = device.publisher(for: \.isAdjustingFocus, options: [.initial, .new])
+
+        // Wait for the device to start adjusting focus; give up if no change arrives within a second.
+        var hasStartedFocusing = false
+        for await isAdjustingFocus in focusStates.timeout(.seconds(1), scheduler: DispatchQueue.main).values {
             guard !Task.isCancelled else { return }
-            guard waitingTime <= timeout else { return }
-            // If current lensPosition equals to the previous one,
-            // it means camera is not start focusing.
-            // Wait a short period of time.
-            try? await Task.sleep(for: .milliseconds(10))
-            waitingTime += 10
-        }
-        
-        let threshold = 10 // The threshold to determine whether the focus has been adjusted
-        var count = 0 // Count for same value.
-        lensPosition = device.lensPosition
-            
-        // Determine whether the camera has finished focusing
-        while count <= threshold {
-            guard !Task.isCancelled else { return }
-            if device.lensPosition == lensPosition {
-                count += 1
-            } else {
-                lensPosition = device.lensPosition
-                count = 0
+            if isAdjustingFocus {
+                hasStartedFocusing = true
+                break
             }
-            try? await Task.sleep(for: .milliseconds(10))
+        }
+        guard hasStartedFocusing, !Task.isCancelled else { return }
+
+        // Wait until the focus adjustment has finished.
+        for await isAdjustingFocus in focusStates.values where !isAdjustingFocus {
+            break
         }
     }
     

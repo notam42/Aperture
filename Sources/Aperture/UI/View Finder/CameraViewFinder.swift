@@ -20,7 +20,7 @@ public struct CameraViewFinder: View {
         /// The content fills the view bounds.
         case fill
         
-        /// The coresponding `AVLayerVideoGravity` value.
+        /// The corresponding `AVLayerVideoGravity` value.
         internal var avLayerVideoGravity: AVLayerVideoGravity {
             switch self {
                 case .fit:
@@ -41,7 +41,7 @@ public struct CameraViewFinder: View {
             self.rawValue = rawValue
         }
         
-        /// Pintch-to-zoom gesture.
+        /// Pinch-to-zoom gesture.
         public static let zoom = Gestures(rawValue: 1 << 0)
         /// Tap-to-focus gesture, as well as press-and-hold to lock focus gesture.
         public static let focus = Gestures(rawValue: 1 << 1)

@@ -42,7 +42,7 @@ public struct ResponsiveButtonStyle: PrimitiveButtonStyle {
     /// Ignore dragging updates if drag translation exceeds the thresholds.
     @State private var ignoreChanges = false
     
-    /// Creates a reponsive button style.
+    /// Creates a responsive button style.
     /// - parameters:
     ///     - minimumScale: The minimum scaling factor to reflect pressing state when user press the button.
     ///     - onPressingChanged: The action to perform when pressing state changes.

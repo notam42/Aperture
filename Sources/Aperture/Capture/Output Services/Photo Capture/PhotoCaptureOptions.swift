@@ -89,7 +89,7 @@ extension PhotoCaptureOptions {
     /// Since `Aperture` requires iOS 17 or later, zero shutter lag is enabled when supported by default.
     static public let `default`: PhotoCaptureOptions = [.zeroShutterLag]
     
-    /// A set of options that would help reducing shot-to-shot lantency.
+    /// A set of options that would help reducing shot-to-shot latency.
     ///
     /// - note: ``autoDeferredPhotoDelivery`` is not included in this set since proxy photo can only be processed via `PhotoKit`.
     static public let prioritizingShotToShotLatency: PhotoCaptureOptions = [
@@ -101,7 +101,7 @@ extension PhotoCaptureOptions {
     /// > Important:
     /// > `24MP` photos will be only delivered as photo proxy and needs post-processing via `PhotoKit`. Under certain conditions (e.g. flash is on), you may still receive a processed photo at `12MP`.
     /// >
-    /// > For more guidance on caprturing `24MP` photo, see ``PhotoCaptureConfiguration/preferredResolution``.
+    /// > For more guidance on capturing `24MP` photo, see ``PhotoCaptureConfiguration/preferredResolution``.
     static public let captures24MPPhotos: PhotoCaptureOptions = [
         .autoDeferredPhotoDelivery
     ]

@@ -18,7 +18,6 @@ public func withValueObservation<V: NSObject, K>(
 ) {
     value
         .publisher(for: keyPath, options: [.initial, .new])
-        .share()
         .sink(receiveValue: action)
         .store(in: &cancellables)
 }

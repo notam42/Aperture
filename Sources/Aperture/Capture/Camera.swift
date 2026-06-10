@@ -25,9 +25,21 @@ public final class Camera: Logging {
     public var device: any SemanticCamera {
         willSet {
             _cameraSwitchingTask?.cancel()
+            guard let captureDevice = newValue.captureDevice else {
+                logger.error("The requested camera device (\(String(describing: type(of: newValue)))) is unavailable on this hardware. Keeping the current device.")
+                if device.captureDevice != nil {
+                    let currentDevice = device
+                    Task { @MainActor in
+                        // Revert unless something else reassigned the device in the meantime.
+                        guard self.device.eraseToAnyEquatable() == newValue.eraseToAnyEquatable() else { return }
+                        self.device = currentDevice
+                    }
+                }
+                return
+            }
             _cameraSwitchingTask = Task { @CameraActor in
                 try await Task.sleep(for: .seconds(0.2))
-                coordinator.cameraInputDevice = newValue.captureDevice
+                coordinator.cameraInputDevice = captureDevice
             }
         }
     }
@@ -37,6 +49,8 @@ public final class Camera: Logging {
     /// - note: Update this value would trigger a session re-configuration.
     public var profile: CameraCaptureProfile {
         willSet {
+            // Skip the costly session re-configuration when nothing changed.
+            guard newValue != profile else { return }
             Task { @CameraActor in
                 coordinator.profile = newValue
             }
@@ -95,7 +109,9 @@ public final class Camera: Logging {
             self.sessionError = .permissionDenied
             throw CameraError.permissionDenied
         }
-        guard self.captureSessionState == .idle else { throw CameraError.sessionAlreadStarted }
+        guard self.captureSessionState == .idle else { throw CameraError.sessionAlreadyStarted }
+        // Claim the session immediately so a concurrent call fails the guard above.
+        self.captureSessionState = .configuring
 
         let coordinator = self.coordinator
         do {
@@ -108,10 +124,9 @@ public final class Camera: Logging {
             }.value
 
             self.sessionError = nil
-            if isRunning {
-                self.captureSessionState = .running
-            }
+            self.captureSessionState = isRunning ? .running : .idle
         } catch {
+            self.captureSessionState = .idle
             self.sessionError = error as? CameraError
             throw error
         }
@@ -151,7 +166,7 @@ public final class Camera: Logging {
             coordinator.withCurrentCaptureDevice { device in
                 guard device.isFocusPointOfInterestSupported,
                       device.isExposurePointOfInterestSupported else {
-                    self.logger.warning("Current device doesn't support focusing or exposing point of interst.")
+                    self.logger.warning("Current device doesn't support focusing or exposing point of interest.")
                     return
                 }
                 device.focusPointOfInterest = pointOfInterest
@@ -178,11 +193,26 @@ public final class Camera: Logging {
 extension Camera {
     /// A Boolean value indicates whether the video device is accessible.
     ///
-    /// - Important: If user hasn't determines the permission, a privacy alert pops up.
+    /// - Important: If user hasn't determined the permission, a privacy alert pops up.
     static public var isAccessible: Bool {
         get async {
             await AVCaptureDevice.requestAccess(for: .video)
         }
+    }
+
+    /// The current camera authorization status.
+    ///
+    /// Use this to distinguish `.notDetermined` from `.denied` (for example, to guide users to Settings) without triggering the system permission dialog.
+    static public var authorizationStatus: AVAuthorizationStatus {
+        AVCaptureDevice.authorizationStatus(for: .video)
+    }
+
+    /// Requests camera access, presenting the system permission dialog if the user hasn't decided yet.
+    ///
+    /// - Returns: Whether camera access is granted.
+    @discardableResult
+    static public func requestAccess() async -> Bool {
+        await AVCaptureDevice.requestAccess(for: .video)
     }
 }
 

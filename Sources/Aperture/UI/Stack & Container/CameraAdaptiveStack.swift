@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-/// A view that dynamically switches layout statck based on device context.
+/// A view that dynamically switches layout stack based on device context.
 public struct CameraAdaptiveStack<Content: View>: View {
     /// The camera view model.
     public var camera: Camera
@@ -15,7 +15,7 @@ public struct CameraAdaptiveStack<Content: View>: View {
     public var spacing: CGFloat?
     @ViewBuilder var content: (CameraAdaptiveStackProxy) -> Content
 
-    /// Creates a view that dynamically switches layout statck based on device context.
+    /// Creates a view that dynamically switches layout stack based on device context.
     public init(
         camera: Camera,
         spacing: CGFloat? = nil,
@@ -26,7 +26,7 @@ public struct CameraAdaptiveStack<Content: View>: View {
         self.content = content
     }
     
-    @State private var fallbackRotationAngle: CGFloat = 90 // default to potrait mode
+    @State private var fallbackRotationAngle: CGFloat = 90 // default to portrait mode
     @Cancellables private var interfaceOrientationObservers
     
     public var body: some View {

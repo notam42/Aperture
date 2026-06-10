@@ -204,7 +204,8 @@ public final class CameraCoordinator: NSObject, Logging {
             }
             self.activeCameraInput = try addInput(from: device)
         } catch {
-            if let activeCameraInput {
+            logger.error("Failed to add input for the new capture device: \(error.localizedDescription). Restoring the previous input.")
+            if let activeCameraInput, captureSession.canAddInput(activeCameraInput) {
                 captureSession.addInput(activeCameraInput)
             }
         }
@@ -275,10 +276,12 @@ public final class CameraCoordinator: NSObject, Logging {
                 try addOutput(output)
             }
         } catch {
+            logger.error("Failed to configure session outputs: \(error.localizedDescription). Restoring the previous outputs.")
             self.activeOutputs.forEach({ captureSession.removeOutput($0) })
-            
-            activeOutputs.forEach({ captureSession.addOutput($0) })
-            self.activeOutputs = activeOutputs
+
+            let restorableOutputs = activeOutputs.filter({ captureSession.canAddOutput($0) })
+            restorableOutputs.forEach({ captureSession.addOutput($0) })
+            self.activeOutputs = restorableOutputs
         }
     }
     
@@ -302,7 +305,9 @@ public final class CameraCoordinator: NSObject, Logging {
     public var cameraInputDevice: AVCaptureDevice! {
         didSet {
             guard let cameraInputDevice, activeCameraInput != nil else { return }
-            
+            // Skip the redundant reconfiguration when the same device is reassigned.
+            guard cameraInputDevice !== oldValue else { return }
+
             do {
                 try switchCaptureDevice(to: cameraInputDevice)
             } catch {

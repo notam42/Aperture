@@ -7,8 +7,8 @@
 
 import AVFoundation
 
-/// A configuation that describes how a camera capture session should be setup.
-public struct CameraCaptureProfile: Sendable {
+/// A configuration that describes how a camera capture session should be setup.
+public struct CameraCaptureProfile: Equatable, Sendable {
     /// The capture session preset that determines the resolution and overall capture quality.
     public var sessionPreset: AVCaptureSession.Preset
     

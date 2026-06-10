@@ -5,12 +5,20 @@ correctness bugs and AVFoundation/SwiftUI best practices around session setup, c
 and the public options API. File/line references are against branch
 `claude/camera-library-swiftui-audit-lpknen` at the time of the audit.
 
-> **Status:** sections 1 (all criticals) and 2 (all high-severity items, 2.1–2.9) are
-> fixed on this branch in the commits following the audit. Notes on the fixes:
+> **Status:** sections 1 (all criticals), 2 (all high-severity items), and most of
+> sections 3–4 are fixed on this branch in the commits following the audit. Notes:
 > 2.2 adds a `CaptureSessionState.interrupted` case and auto-restart on
 > media-services reset; 2.6 surfaces errors via the new `Camera.State.sessionError`;
 > 2.9 disables Live Photo capture on Mac Catalyst to match the delegate availability
-> and raises the Catalyst platform floor to 17. Sections 3 and 4 remain open.
+> and raises the Catalyst platform floor to 17. The `displayVideoZoomFactorMultiplier`
+> availability concern in section 3 was **verified against Apple's documentation and
+> found to be a false alarm** — the API is introduced in iOS 18.0 / macOS 14.0 /
+> Mac Catalyst 14.0, exactly matching the existing gate; no change made. The public
+> `sessionAlreadStarted` case was renamed to `sessionAlreadyStarted` (source-breaking,
+> pre-1.0). Still open by choice: the Live Photo pipeline force-enable (would need a
+> new `PhotoCaptureOptions` flag, an API design decision), the private `hd1080p`/`hd4k`
+> presets (blocked on `MovieCaptureService` being completed), the shared preview-view
+> instance, and the cached-`Logger` nit.
 
 ---
 

@@ -55,6 +55,9 @@ public struct CapturedPhoto: Sendable, Hashable {
     }
 
     /// The file URL of the associated Live Photo movie, if available.
+    ///
+    /// The movie is written to the temporary directory and you own the file once the capture completes:
+    /// move it (or hand it to `PhotoKit`) promptly, and delete it when you no longer need it — the library doesn't clean it up for you.
     public var livePhotoMovieURL: URL?
 
     /// A Boolean value indicating whether captured photo is a Live Photo.

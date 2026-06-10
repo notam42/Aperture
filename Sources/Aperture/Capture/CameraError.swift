@@ -32,7 +32,7 @@ public enum CameraError: LocalizedError {
     case invalidCaptureDevice
     case permissionDenied
     case unsatisfiablePhotoCaptureConfiguration(key: String)
-    case sessionAlreadStarted
+    case sessionAlreadyStarted
     case failedToAddOutput
     case failedToAddInput
     case failedToUpdateOutputService
@@ -43,7 +43,7 @@ public enum CameraError: LocalizedError {
                 "Invalid capture device is specified."
             case .permissionDenied:
                 "User denied the camera access."
-            case .sessionAlreadStarted:
+            case .sessionAlreadyStarted:
                 "AVCaptureSession is currently running, no need to run it again."
             case .unsatisfiablePhotoCaptureConfiguration(let key):
                 "No available option satisfies the photo capture configuration for key: \(key)."

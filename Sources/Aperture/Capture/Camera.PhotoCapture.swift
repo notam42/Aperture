@@ -57,12 +57,21 @@ extension Camera {
 
         // Release the in-flight delegate on success and failure alike,
         // so failed captures don't leak their delegate.
+        @MainActor func finishCapture() {
+            inFlightPhotoCaptureDelegates[captureID] = nil
+            // Readiness tracking for this request has stopped; clear shutter state
+            // once no captures remain in flight so it can't be left stale.
+            if inFlightPhotoCaptureDelegates.isEmpty {
+                state.shutterDisabled = false
+                state.isBusyProcessing = false
+            }
+        }
         do {
             let capturedPhoto = try await performCapture()
-            await MainActor.run { self.inFlightPhotoCaptureDelegates[captureID] = nil }
+            await finishCapture()
             return capturedPhoto
         } catch {
-            await MainActor.run { self.inFlightPhotoCaptureDelegates[captureID] = nil }
+            await finishCapture()
             throw error
         }
     }

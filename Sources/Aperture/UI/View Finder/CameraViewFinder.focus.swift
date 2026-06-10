@@ -66,7 +66,10 @@ extension CameraViewFinder {
                 }
                 .onReceive(
                     NotificationCenter.default.publisher(for: .AVCaptureDeviceSubjectAreaDidChange)
-                ) { _ in
+                ) { notification in
+                    // Only react to changes from this camera's active capture device.
+                    guard let device = notification.object as? AVCaptureDevice,
+                          device.uniqueID == camera.device.uniqueID else { return }
                     let coordinator = camera.coordinator
                     Task { @CameraActor in
                         coordinator.withCurrentCaptureDevice { device in

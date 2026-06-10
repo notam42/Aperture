@@ -221,7 +221,7 @@ extension PhotoCaptureService {
     ) {
         #if os(iOS)
         guard _isSettingPhotoPrioritizationSupported(on: photoSettings) else {
-            logger.warning("Setting quality priotitization is not supported when capturing a Bayer RAW photo.")
+            logger.warning("Setting quality prioritization is not supported when capturing a Bayer RAW photo.")
             return
         }
         #endif

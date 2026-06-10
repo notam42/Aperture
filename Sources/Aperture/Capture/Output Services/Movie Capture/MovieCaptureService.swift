@@ -9,11 +9,11 @@ import AVFoundation
 
 @_spi(Internal)
 public struct MovieCaptureService: OutputService {
-    var configuraton: MovieCaptureConfiguration
-    
+    var configuration: MovieCaptureConfiguration
+
     @_spi(Internal)
     public init(configuration: MovieCaptureConfiguration = .init()) {
-        self.configuraton = configuration
+        self.configuration = configuration
     }
     
     public func makeOutput(context: Context) -> AVCaptureMovieFileOutput {

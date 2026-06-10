@@ -28,7 +28,7 @@ extension View {
 /// Even if you swap the order of the modifiers, it produces unexpected behaviors if you put it inside a layout container (e.g. `VStack`, `HStack`, etc.)
 ///
 /// Adopt this view modifier if you want to make sure the aspect ratio and want to ignore safe areas.
-/// It works well for all senerios, making sure your aspect ratio never change even if you ignored safe areas on specific edges.
+/// It works well for all scenarios, making sure your aspect ratio never change even if you ignored safe areas on specific edges.
 @_spi(Internal)
 public struct _FitAspectRatioViewModifier: ViewModifier {
     var aspectRatio: CGFloat
