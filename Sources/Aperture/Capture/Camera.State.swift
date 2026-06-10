@@ -80,7 +80,11 @@ extension Camera {
                 defer { camera.coordinator.isSettingZoomFactor = false }
                 
                 camera.coordinator.withCurrentCaptureDevice { device in
-                    device.videoZoomFactor = zoomFactor
+                    // Values outside the available range raise an Objective-C exception.
+                    device.videoZoomFactor = min(
+                        max(zoomFactor, device.minAvailableVideoZoomFactor),
+                        device.maxAvailableVideoZoomFactor
+                    )
                 }
             }
         }

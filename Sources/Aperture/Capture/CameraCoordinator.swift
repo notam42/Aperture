@@ -421,9 +421,8 @@ extension CameraCoordinator {
         perform action: @MainActor @Sendable @escaping (Camera) -> Void
     ) {
         Task { @MainActor [weak self] in
-            guard let self else { return }
-            precondition(self.camera != nil, "Camera is not available.")
-            action(self.camera)
+            guard let self, let camera = self.camera else { return }
+            action(camera)
         }
     }
 

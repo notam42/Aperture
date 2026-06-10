@@ -70,44 +70,41 @@ public final class Camera: Logging {
         
         let coordinator = CameraCoordinator(configuration: profile)
         self.coordinator = coordinator
-        defer {
-            let captureDevice = device.captureDevice
-            Task { @CameraActor in
-                await MainActor.run {
-                    self.coordinator.camera = self
-                }
-                coordinator.cameraInputDevice = captureDevice
-            }
-        }
-        
         self.state = State(camera: nil)
-        defer {
-            Task { @MainActor in
-                self.state.camera = self
-            }
-        }
-        
+
+        // Wire back-references synchronously so KVO-driven device switches and
+        // state updates can never observe a half-initialized camera.
+        self.state.camera = self
+        self.coordinator.camera = self
         self._automaticCameraObserver = AutomaticCameraObserver(camera: self)
+
+        let captureDevice = device.captureDevice
+        Task { @CameraActor in
+            coordinator.cameraInputDevice = captureDevice
+        }
     }
     
     // MARK: - Session Management
     
     /// Starts the session.
+    ///
+    /// This method returns once the capture pipeline is configured and the session has started,
+    /// and throws if the camera is inaccessible or the session cannot be configured.
     public func startRunning() async throws {
         guard await Camera.isAccessible else { throw CameraError.permissionDenied }
         guard self.captureSessionState == .idle else { throw CameraError.sessionAlreadStarted }
-        
-        Task { @CameraActor in
+
+        let coordinator = self.coordinator
+        let isRunning = try await Task { @CameraActor in
             try coordinator.configureSession()
             if !coordinator.captureSession.isRunning {
                 coordinator.captureSession.startRunning()
             }
-            
-            if coordinator.captureSession.isRunning {
-                Task { @MainActor in
-                    self.captureSessionState = .running
-                }
-            }
+            return coordinator.captureSession.isRunning
+        }.value
+
+        if isRunning {
+            self.captureSessionState = .running
         }
     }
     
@@ -200,6 +197,11 @@ fileprivate extension Camera {
                 options: [.new],
                 context: nil
             )
+        }
+
+        deinit {
+            AVCaptureDevice.self.removeObserver(self, forKeyPath: "systemPreferredCamera")
+            AVCaptureDevice.self.removeObserver(self, forKeyPath: "userPreferredCamera")
         }
 
         public override func observeValue(

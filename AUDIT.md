@@ -3,7 +3,11 @@
 Audit of the full `Sources/Aperture` tree (54 Swift files, ~4,900 lines), focused on
 correctness bugs and AVFoundation/SwiftUI best practices around session setup, capture,
 and the public options API. File/line references are against branch
-`claude/camera-library-swiftui-audit-lpknen`.
+`claude/camera-library-swiftui-audit-lpknen` at the time of the audit.
+
+> **Status:** items 1.1–1.7 (all criticals) and 2.1 (`startRunning` error propagation)
+> are fixed on this branch in the commit following the audit. Sections 2.2–2.9 and
+> below remain open.
 
 ---
 

@@ -32,7 +32,6 @@ struct _FocusTargetBoundingBox: View {
         }
     }
     @State private var exposureBiasSide = ExposureBiasSide.right
-    @State private var isUnlocked = false
     @State private var exposureY = CGFloat.zero
     @State private var lastExposureY = CGFloat.zero
     
@@ -177,24 +176,22 @@ struct _FocusTargetBoundingBox: View {
             .onChanged {
                 idleTimer?.cancel()
                 currentPhase = .normal
-                do {
-                    guard let device = camera.device.captureDevice else { return }
-                    if !isUnlocked {
-                        try device.lockForConfiguration()
-                        self.isUnlocked = true
+                self.exposureY = max(-37.5, min(37.5, self.lastExposureY + $0))
+                let ev = Float(-self.exposureY / 37.5 * 3.0)
+
+                let coordinator = camera.coordinator
+                Task { @CameraActor in
+                    coordinator.withCurrentCaptureDevice { device in
+                        if device.isExposureModeSupported(.autoExpose) {
+                            device.exposureMode = .autoExpose
+                        }
+                        let bias = min(max(ev, device.minExposureTargetBias), device.maxExposureTargetBias)
+                        device.setExposureTargetBias(bias)
                     }
-                    self.exposureY = max(-37.5, min(37.5, self.lastExposureY + $0))
-                    let ev = -self.exposureY / 37.5 * 3.0
-                    device.exposureMode = .autoExpose
-                    device.setExposureTargetBias(Float(ev))
-                } catch {
-                    camera.coordinator.logger.error("Cannot lock device for configuration: \(error.localizedDescription)")
                 }
             }
             .onEnded { _ in
                 updateFocusIndicator()
-                camera.device.captureDevice?.unlockForConfiguration()
-                self.isUnlocked = false
                 self.lastExposureY = self.exposureY
             }
     }

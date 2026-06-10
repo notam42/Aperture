@@ -96,12 +96,12 @@ public struct PhotoCaptureService: OutputService, Logging {
     }
     
     public final class Coordinator: FlashSceneRecommendationDelegate, @unchecked Sendable {
-        weak var cameraCoordinator: CameraCoordinator!
-        
+        weak var cameraCoordinator: CameraCoordinator?
+
         func setFlashScene(_ isFlashScene: Bool) {
             Task { @MainActor in
-                precondition(cameraCoordinator != nil, "CameraCoordinator must not equal to nil")
-                cameraCoordinator?.camera.state.flash.isFlashRecommendedByScene = isFlashScene
+                guard let camera = cameraCoordinator?.camera else { return }
+                camera.state.flash.isFlashRecommendedByScene = isFlashScene
             }
         }
     }
@@ -166,13 +166,18 @@ extension PhotoCaptureService {
         }
         #endif
         #if os(iOS)
-        photoSettings.livePhotoMovieFileURL = configuration.capturesLivePhoto ? URL.movieFileURL : nil
+        // Requesting a Live Photo on an output that doesn't have Live Photo capture
+        // enabled raises an Objective-C exception.
+        if configuration.capturesLivePhoto && !output.isLivePhotoCaptureEnabled {
+            logger.warning("[Live Photo] Live Photo capture is not supported by the current device or configuration. Capturing a still photo instead.")
+        }
+        photoSettings.livePhotoMovieFileURL = (configuration.capturesLivePhoto && output.isLivePhotoCaptureEnabled) ? URL.movieFileURL : nil
         photoSettings.isDepthDataDeliveryEnabled = output.isDepthDataDeliveryEnabled
         photoSettings.isPortraitEffectsMatteDeliveryEnabled = output.isPortraitEffectsMatteDeliveryEnabled
         #endif
         
-        let flash = await context.coordinator.cameraCoordinator.camera.state.flash
-        if output.supportedFlashModes.contains(flash.userSelectedMode) {
+        let flash = await context.coordinator.cameraCoordinator?.camera?.state.flash
+        if let flash, output.supportedFlashModes.contains(flash.userSelectedMode) {
             photoSettings.flashMode = flash.userSelectedMode
         }
         
