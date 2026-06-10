@@ -28,6 +28,7 @@ public struct CameraZoomButton<Label: View>: View {
     ) {
         self.camera = camera
         self.zoomFactor = zoomFactor
+        self.animation = animation
         self.label = label()
     }
     

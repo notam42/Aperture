@@ -61,7 +61,11 @@ public struct PhotoCaptureService: OutputService, Logging {
             }
         }
         #if os(iOS)
+        #if !targetEnvironment(macCatalyst)
+        // Live Photo delegate callbacks are not compiled for Mac Catalyst (see PhotoCaptureDelegate),
+        // so keep the Live Photo pipeline disabled there.
         output.isLivePhotoCaptureEnabled = output.isLivePhotoCaptureSupported
+        #endif
         if output.isAutoDeferredPhotoDeliverySupported {
             output.isAutoDeferredPhotoDeliveryEnabled = options.contains(.autoDeferredPhotoDelivery)
         }
@@ -165,13 +169,15 @@ extension PhotoCaptureService {
             }
         }
         #endif
-        #if os(iOS)
+        #if os(iOS) && !targetEnvironment(macCatalyst)
         // Requesting a Live Photo on an output that doesn't have Live Photo capture
         // enabled raises an Objective-C exception.
         if configuration.capturesLivePhoto && !output.isLivePhotoCaptureEnabled {
             logger.warning("[Live Photo] Live Photo capture is not supported by the current device or configuration. Capturing a still photo instead.")
         }
         photoSettings.livePhotoMovieFileURL = (configuration.capturesLivePhoto && output.isLivePhotoCaptureEnabled) ? URL.movieFileURL : nil
+        #endif
+        #if os(iOS)
         photoSettings.isDepthDataDeliveryEnabled = output.isDepthDataDeliveryEnabled
         photoSettings.isPortraitEffectsMatteDeliveryEnabled = output.isPortraitEffectsMatteDeliveryEnabled
         #endif

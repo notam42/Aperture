@@ -31,29 +31,40 @@ extension Camera {
             return (photoOutput, photoSettings)
         }()
 
-        let capturedPhoto = try await withPhotoOutputReadinessCoordinatorTracking(
-            output: photoOutput,
-            photoSettings: photoSettings
-        ) {
-            try await withCheckedThrowingContinuation { continuation in
-                let delegate = PhotoCaptureDelegate(
-                    camera: self,
-                    dataRepresentationCustomizer: dataRepresentationCustomizer,
-                    continuation: continuation
-                )
-                Task { @MainActor in
-                    self.inFlightPhotoCaptureDelegates[photoSettings.uniqueID] = delegate
-                }
+        let captureID = photoSettings.uniqueID
+        func performCapture() async throws -> CapturedPhoto {
+            try await withPhotoOutputReadinessCoordinatorTracking(
+                output: photoOutput,
+                photoSettings: photoSettings
+            ) {
+                try await withCheckedThrowingContinuation { continuation in
+                    let delegate = PhotoCaptureDelegate(
+                        camera: self,
+                        dataRepresentationCustomizer: dataRepresentationCustomizer,
+                        continuation: continuation
+                    )
+                    Task { @MainActor in
+                        self.inFlightPhotoCaptureDelegates[captureID] = delegate
+                    }
 
-                photoOutput.capturePhoto(with: photoSettings, delegate: delegate)
+                    // Interactions with the capture output are serialized on the session actor.
+                    Task { @CameraActor in
+                        photoOutput.capturePhoto(with: photoSettings, delegate: delegate)
+                    }
+                }
             }
         }
 
-        Task { @MainActor in
-            self.inFlightPhotoCaptureDelegates[photoSettings.uniqueID] = nil
+        // Release the in-flight delegate on success and failure alike,
+        // so failed captures don't leak their delegate.
+        do {
+            let capturedPhoto = try await performCapture()
+            await MainActor.run { self.inFlightPhotoCaptureDelegates[captureID] = nil }
+            return capturedPhoto
+        } catch {
+            await MainActor.run { self.inFlightPhotoCaptureDelegates[captureID] = nil }
+            throw error
         }
-
-        return capturedPhoto
     }
     
     nonisolated private func withPhotoOutputReadinessCoordinatorTracking<T>(

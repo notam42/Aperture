@@ -19,7 +19,9 @@ final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, Loggi
     let dataRepresentationCustomizer: (any PhotoFileDataRepresentationCustomizer)?
     
     private var capturedPhoto = CapturedPhoto()
-    
+    /// The first error reported by the capture pipeline, surfaced to the caller when no photo data was delivered.
+    private var captureError: (any Error)?
+
     init(
         camera: Camera,
         dataRepresentationCustomizer: (any PhotoFileDataRepresentationCustomizer)?,
@@ -34,7 +36,7 @@ final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, Loggi
         _ output: AVCapturePhotoOutput,
         willCapturePhotoFor resolvedSettings: AVCaptureResolvedPhotoSettings
     ) {
-        #if os(iOS)
+        #if os(iOS) && !targetEnvironment(macCatalyst)
         if !resolvedSettings.livePhotoMovieDimensions.isZero {
             Task { @MainActor in
                 camera.state.inProgressLivePhotoCount += 1
@@ -58,9 +60,10 @@ final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, Loggi
     ) {
         if let error {
             logger.error("There is an error when finishing processing photo: \(error.localizedDescription)")
+            captureError = captureError ?? error
             return
         }
-        
+
         let photoData: Data?
         #if os(iOS)
         photoData = if let dataRepresentationCustomizer {
@@ -113,6 +116,7 @@ final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, Loggi
     ) {
         if let error {
             logger.debug("Error processing Live Photo companion movie: \(String(describing: error))")
+            return
         }
         capturedPhoto.livePhotoMovieURL = outputFileURL
     }
@@ -124,9 +128,10 @@ final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, Loggi
     ) {
         if let error {
             logger.error("There is an error when finishing capturing deferred photo: \(error.localizedDescription)")
+            captureError = captureError ?? error
             return
         }
-        
+
         let proxyData = if let dataRepresentationCustomizer {
             deferredPhotoProxy?.fileDataRepresentation(with: dataRepresentationCustomizer)
         } else {
@@ -148,9 +153,10 @@ final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, Loggi
         if let error {
             logger.error("There is an error when finishing processing photo: \(error.localizedDescription)")
         }
-        
+
         guard capturedPhoto.isValid else {
-            continuation.resume(throwing: PhotoCaptureError.noPhotoData)
+            // Surface the actual pipeline error to the awaiting caller when one was reported.
+            continuation.resume(throwing: captureError ?? error ?? PhotoCaptureError.noPhotoData)
             return
         }
         

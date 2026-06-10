@@ -54,6 +54,7 @@ public final class CameraCoordinator: NSObject, Logging {
     
     /// Configure current session and corresponding capture pipeline with current profile and devices.
     internal func configureSession() throws {
+        registerSessionNotificationObserversIfNeeded()
         setConfigurationState(true)
         captureSession.beginConfiguration()
         defer {
@@ -82,6 +83,81 @@ public final class CameraCoordinator: NSObject, Logging {
         updateOutputServices()
     }
     
+    // MARK: Session Lifecycle Notifications
+
+    private var hasRegisteredSessionNotificationObservers = false
+    @Cancellables private var sessionNotificationObservers
+
+    /// Observes session interruptions and runtime errors so that ``Camera/State/captureSessionState`` reflects the actual session state.
+    private func registerSessionNotificationObserversIfNeeded() {
+        guard !hasRegisteredSessionNotificationObservers else { return }
+        hasRegisteredSessionNotificationObservers = true
+
+        let notificationCenter = NotificationCenter.default
+
+        notificationCenter
+            .publisher(for: AVCaptureSession.runtimeErrorNotification, object: captureSession)
+            .sink { [weak self] notification in
+                self?.handleSessionRuntimeError(notification)
+            }
+            .store(in: &sessionNotificationObservers)
+
+        #if os(iOS)
+        notificationCenter
+            .publisher(for: AVCaptureSession.wasInterruptedNotification, object: captureSession)
+            .sink { [weak self] _ in
+                self?.updateCamera { camera in
+                    guard camera.state.captureSessionState == .running else { return }
+                    camera.state.captureSessionState = .interrupted
+                }
+            }
+            .store(in: &sessionNotificationObservers)
+
+        notificationCenter
+            .publisher(for: AVCaptureSession.interruptionEndedNotification, object: captureSession)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task { @CameraActor in
+                    let isRunning = self.captureSession.isRunning
+                    self.updateCamera { camera in
+                        guard camera.state.captureSessionState == .interrupted else { return }
+                        camera.state.captureSessionState = isRunning ? .running : .idle
+                    }
+                }
+            }
+            .store(in: &sessionNotificationObservers)
+        #endif
+    }
+
+    /// Handles a session runtime error, restarting the session when media services were reset while the camera was in use.
+    nonisolated private func handleSessionRuntimeError(_ notification: Notification) {
+        let nsError = notification.userInfo?[AVCaptureSessionErrorKey] as? NSError
+        logger.error("Capture session runtime error: \(nsError?.localizedDescription ?? "unknown error")")
+
+        var shouldAttemptRestart = false
+        #if os(iOS)
+        shouldAttemptRestart = nsError?.code == AVError.Code.mediaServicesWereReset.rawValue
+        #endif
+
+        Task { @CameraActor [weak self] in
+            guard let self else { return }
+
+            let wasInUse = await MainActor.run {
+                let state = self.camera?.state.captureSessionState
+                return state == .running || state == .interrupted
+            }
+
+            if shouldAttemptRestart, wasInUse, !self.captureSession.isRunning {
+                self.captureSession.startRunning()
+            }
+
+            let isRunning = self.captureSession.isRunning
+            self.updateCamera { camera in
+                camera.state.captureSessionState = isRunning ? .running : .idle
+            }
+        }
+    }
+
     internal func switchCaptureDevice(to device: AVCaptureDevice) throws {
         precondition(activeCameraInput != nil, "Switch capture device requires an existing capture device.")
         

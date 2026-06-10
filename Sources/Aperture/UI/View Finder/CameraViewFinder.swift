@@ -60,7 +60,6 @@ public struct CameraViewFinder: View {
         self.gestures = gestures
     }
     
-    @State private var cameraError: CameraError?
     @State private var position: CameraPosition?
     
     public var body: some View {
@@ -88,18 +87,20 @@ public struct CameraViewFinder: View {
                 /* name: "camera-zoom", */
                 isEnabled: gestures.contains(.zoom)
             )
+            .overlay { errorOverlay }
             .clipped()
             .disabled(camera.captureSessionState != .running)
     }
-    
+
     @ViewBuilder
     private var errorOverlay: some View {
-        if let cameraError {
+        if let sessionError = camera.sessionError {
             ContentUnavailableView(
                 "Camera Unavailable",
                 systemImage: "xmark.octagon",
-                description: Text(cameraError.localizedDescription)
+                description: Text(sessionError.localizedDescription)
             )
+            .environment(\.colorScheme, .dark)
         }
     }
 }

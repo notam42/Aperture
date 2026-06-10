@@ -91,28 +91,40 @@ public final class Camera: Logging {
     /// This method returns once the capture pipeline is configured and the session has started,
     /// and throws if the camera is inaccessible or the session cannot be configured.
     public func startRunning() async throws {
-        guard await Camera.isAccessible else { throw CameraError.permissionDenied }
+        guard await Camera.isAccessible else {
+            self.sessionError = .permissionDenied
+            throw CameraError.permissionDenied
+        }
         guard self.captureSessionState == .idle else { throw CameraError.sessionAlreadStarted }
 
         let coordinator = self.coordinator
-        let isRunning = try await Task { @CameraActor in
-            try coordinator.configureSession()
-            if !coordinator.captureSession.isRunning {
-                coordinator.captureSession.startRunning()
-            }
-            return coordinator.captureSession.isRunning
-        }.value
+        do {
+            let isRunning = try await Task { @CameraActor in
+                try coordinator.configureSession()
+                if !coordinator.captureSession.isRunning {
+                    coordinator.captureSession.startRunning()
+                }
+                return coordinator.captureSession.isRunning
+            }.value
 
-        if isRunning {
-            self.captureSessionState = .running
+            self.sessionError = nil
+            if isRunning {
+                self.captureSessionState = .running
+            }
+        } catch {
+            self.sessionError = error as? CameraError
+            throw error
         }
     }
-    
+
     /// Stops the session.
+    ///
+    /// Transient capture state (focus lock, preview dimming, in-flight indicators) is reset; user-facing settings such as the selected flash mode and zoom factor are preserved.
     public func stopRunning() {
         self.captureSessionState = .idle
-        state = State(camera: self)
-        
+        self.state.resetTransientState()
+
+        let coordinator = self.coordinator
         Task { @CameraActor in
             coordinator.captureSession.stopRunning()
         }

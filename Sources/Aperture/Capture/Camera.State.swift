@@ -28,7 +28,14 @@ extension Camera {
             case running
             /// The session is under configuring.
             case configuring
+            /// The session is temporarily interrupted by the system, for example by a phone call, Split View, or another app using the camera. The session resumes automatically when the interruption ends.
+            case interrupted
         }
+
+        /// The most recent session-level error, if any.
+        ///
+        /// This value is set when the session fails to start or configure (for example, when camera permission is denied), and cleared when the session starts successfully.
+        internal(set) public var sessionError: CameraError? = nil
 
         /// An observable angle to apply to the preview layer so that it’s level relative to gravity.
         ///
@@ -108,6 +115,19 @@ extension Camera {
         /// This value represents the effective zoom relative to the base (wide-angle) camera, making it suitable for display in the user interface.
         public var displayZoomFactor: CGFloat {
             zoomFactor * displayZoomFactorMultiplier
+        }
+
+        /// Resets transient, capture-related values while preserving user-facing settings such as the selected flash mode and zoom factor.
+        internal func resetTransientState() {
+            previewRotationAngle = nil
+            captureRotationAngle = nil
+            previewDimming = false
+            isBusyProcessing = false
+            shutterDisabled = false
+            inProgressLivePhotoCount = 0
+            focusLocked = false
+            flash.isFlashRecommendedByScene = false
+            sessionError = nil
         }
     }
 }
