@@ -20,4 +20,12 @@ public final actor CameraActor {
     nonisolated public var unownedExecutor: UnownedSerialExecutor {
         sessionQueue.asUnownedSerialExecutor()
     }
+
+    /// The serial dispatch queue backing this actor's executor.
+    ///
+    /// Use this when an AVFoundation API requires a callback queue that should be serialized with all other camera session work.
+    @_spi(Internal)
+    nonisolated public static var queue: DispatchSerialQueue {
+        shared.sessionQueue
+    }
 }

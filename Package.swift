@@ -6,9 +6,9 @@ import PackageDescription
 let package = Package(
     name: "Aperture",
     platforms: [
-        .iOS(.v17),
-        .macOS(.v14),
-        .macCatalyst(.v17),
+        .iOS(.v26),
+        .macOS(.v26),
+        .macCatalyst(.v26),
     ],
     products: [
         .library(

@@ -69,7 +69,9 @@ public final class CameraCoordinator: NSObject, Logging {
         #if os(iOS)
         captureSession.isMultitaskingCameraAccessEnabled = captureSession.isMultitaskingCameraAccessSupported
         #endif
-        
+
+        configureDeferredStartIfNeeded()
+
         guard let inputDevice = cameraInputDevice else { throw CameraError.invalidCaptureDevice }
         
         configureSessionInput(device: inputDevice)
@@ -82,7 +84,30 @@ public final class CameraCoordinator: NSObject, Logging {
         
         updateOutputServices()
     }
-    
+
+    // MARK: Deferred Start
+
+    private var hasConfiguredDeferredStart = false
+    private var deferredStartDelegate: DeferredStartDelegate?
+
+    /// Adopts automatic deferred start so the session brings up the preview first and starts data outputs
+    /// (such as the photo output) a short time afterward, reducing the time to the first preview frame.
+    ///
+    /// The preview layer is never deferred (see ``CameraPreview``); only data outputs are (see ``addOutput(_:)``).
+    private func configureDeferredStartIfNeeded() {
+        captureSession.automaticallyRunsDeferredStart = true
+
+        guard !hasConfiguredDeferredStart else { return }
+        hasConfiguredDeferredStart = true
+
+        let delegate = DeferredStartDelegate()
+        self.deferredStartDelegate = delegate
+        captureSession.setDeferredStartDelegate(
+            delegate,
+            deferredStartDelegateCallbackQueue: CameraActor.queue
+        )
+    }
+
     // MARK: Session Lifecycle Notifications
 
     private var hasRegisteredSessionNotificationObservers = false
@@ -398,6 +423,10 @@ public final class CameraCoordinator: NSObject, Logging {
     private func addOutput(_ output: AVCaptureOutput) throws(CameraError) {
         if captureSession.canAddOutput(output) {
             captureSession.addOutput(output)
+            // Defer data outputs so the preview can start first; the preview layer itself is never deferred.
+            if output.isDeferredStartSupported {
+                output.isDeferredStartEnabled = true
+            }
         } else {
             throw CameraError.failedToAddOutput
         }
@@ -521,5 +550,20 @@ extension CameraCoordinator {
                     break
             }
         }
+    }
+}
+
+// MARK: - Deferred Start Delegate
+
+/// Observes the session's deferred-start lifecycle for diagnostics.
+///
+/// Callbacks are delivered on ``CameraActor``'s serial queue, so they are serialized with all other session work.
+private final class DeferredStartDelegate: NSObject, AVCaptureSessionDeferredStartDelegate, Logging, @unchecked Sendable {
+    func sessionWillRunDeferredStart(_ session: AVCaptureSession) {
+        logger.debug("Capture session will run deferred start.")
+    }
+
+    func sessionDidRunDeferredStart(_ session: AVCaptureSession) {
+        logger.debug("Capture session did run deferred start.")
     }
 }

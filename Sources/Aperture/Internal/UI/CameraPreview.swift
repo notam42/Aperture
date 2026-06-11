@@ -23,6 +23,10 @@ struct CameraPreview: Sendable {
     
     nonisolated func connect(to session: AVCaptureSession) {
         Task { @MainActor in
+            // The preview should always start immediately; only data outputs are deferred (see CameraCoordinator).
+            if preview.videoPreviewLayer.isDeferredStartSupported {
+                preview.videoPreviewLayer.isDeferredStartEnabled = false
+            }
             guard preview.session != session else { return }
             preview.session = session
         }

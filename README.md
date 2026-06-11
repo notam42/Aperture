@@ -6,8 +6,8 @@ Integrate camera experience into your SwiftUI apps.
 
 ## Requirements
 
-- iOS 17+
-- macOS 14+
+- iOS 26+
+- macOS 26+
 
 > [!IMPORTANT]
 > Make sure you have added `NSCameraUsageDescription` to your app's Info.plist to access camera.
