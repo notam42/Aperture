@@ -58,6 +58,14 @@ extension Camera {
         ///
         /// - SeeAlso: ``CameraViewFinder``
         internal(set) public var focusLocked = false
+
+        #if os(iOS)
+        /// A Boolean value that indicates whether the Camera Control is presenting its controls overlay in fullscreen.
+        ///
+        /// When `true`, minimize camera UI to help people focus on the Camera Control interaction.
+        /// Restore hidden UI when this returns to `false`.
+        internal(set) public var controlsFullscreen = false
+        #endif
         
         #if os(iOS)
         /// A value that controls the cropping and enlargement of images based on current device factor.

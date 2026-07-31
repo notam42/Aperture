@@ -155,6 +155,12 @@ public final class CameraCoordinator: NSObject, Logging {
         updateCamera { camera in
             camera.state.flash.deviceEligible = device.hasFlash
         }
+
+        #if os(iOS)
+        if #available(iOS 18.0, *) {
+            configureControls(for: device)
+        }
+        #endif
     }
     
     private func configureSessionOutputs() {
@@ -263,6 +269,28 @@ public final class CameraCoordinator: NSObject, Logging {
         return cameraInputDevice.displayVideoZoomFactorMultiplier
     }
     #if os(iOS)
+    @available(iOS 18.0, *)
+    private func configureControls(for device: AVCaptureDevice) {
+        guard captureSession.supportsControls else { return }
+
+        for control in captureSession.controls {
+            captureSession.removeControl(control)
+        }
+
+        let zoomSlider = AVCaptureSystemZoomSlider(device: device)
+        let exposureSlider = AVCaptureSystemExposureBiasSlider(device: device)
+
+        for control in [zoomSlider as AVCaptureControl, exposureSlider] {
+            if captureSession.canAddControl(control) {
+                captureSession.addControl(control)
+            } else {
+                logger.warning("Unable to add capture control \(control).")
+            }
+        }
+
+        captureSession.setControlsDelegate(self, queue: .main)
+    }
+
     /// A boolean value indicating whether the capture device is setting its zoom factor.
     @_spi(Internal)
     public var isSettingZoomFactor = false
@@ -443,3 +471,22 @@ extension CameraCoordinator {
         }
     }
 }
+
+// MARK: - Camera Control (iOS)
+
+#if os(iOS)
+@available(iOS 18.0, *)
+extension CameraCoordinator: AVCaptureSessionControlsDelegate {
+    nonisolated public func sessionControlsDidBecomeActive(_ session: AVCaptureSession) {}
+
+    nonisolated public func sessionControlsWillEnterFullscreenAppearance(_ session: AVCaptureSession) {
+        updateCamera { $0.state.controlsFullscreen = true }
+    }
+
+    nonisolated public func sessionControlsWillExitFullscreenAppearance(_ session: AVCaptureSession) {
+        updateCamera { $0.state.controlsFullscreen = false }
+    }
+
+    nonisolated public func sessionControlsDidBecomeInactive(_ session: AVCaptureSession) {}
+}
+#endif

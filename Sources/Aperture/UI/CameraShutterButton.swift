@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+#if os(iOS)
+import AVKit
+#endif
 
 /// A button that captures photo using current capture device.
 @available(watchOS, unavailable)
@@ -67,9 +70,26 @@ extension CameraShutterButton {
         @State private var presentsErrorAlert = false
         
         var body: some View {
+            #if os(iOS)
+            if #available(iOS 18.0, *) {
+                baseContent
+                    .onCameraCaptureEvent(isEnabled: !camera.shutterDisabled) { event in
+                        if event.phase == .ended {
+                            takePhoto()
+                        }
+                    }
+            } else {
+                baseContent
+            }
+            #else
+            baseContent
+            #endif
+        }
+
+        private var baseContent: some View {
             GeometryReader { buttonProxy in
                 let buttonSize = buttonProxy.size.width // assumes it has 1:1 aspect ratio
-                
+
                 ZStack {
                     Circle()
                         .stroke(lineWidth: lineWidth)
