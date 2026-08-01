@@ -271,7 +271,10 @@ public final class CameraCoordinator: NSObject, Logging {
     #if os(iOS)
     @available(iOS 18.0, *)
     private func configureControls(for device: AVCaptureDevice) {
-        guard captureSession.supportsControls else { return }
+        guard captureSession.supportsControls else {
+            updateCamera { $0.state.isSystemZoomSliderActive = false }
+            return
+        }
 
         for control in captureSession.controls {
             captureSession.removeControl(control)
@@ -280,14 +283,17 @@ public final class CameraCoordinator: NSObject, Logging {
         let zoomSlider = AVCaptureSystemZoomSlider(device: device)
         let exposureSlider = AVCaptureSystemExposureBiasSlider(device: device)
 
+        var zoomSliderAdded = false
         for control in [zoomSlider as AVCaptureControl, exposureSlider] {
             if captureSession.canAddControl(control) {
                 captureSession.addControl(control)
+                if control === zoomSlider { zoomSliderAdded = true }
             } else {
                 logger.warning("Unable to add capture control \(control).")
             }
         }
 
+        updateCamera { $0.state.isSystemZoomSliderActive = zoomSliderAdded }
         captureSession.setControlsDelegate(self, queue: .main)
     }
 

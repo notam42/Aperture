@@ -65,6 +65,12 @@ extension Camera {
         /// When `true`, minimize camera UI to help people focus on the Camera Control interaction.
         /// Restore hidden UI when this returns to `false`.
         internal(set) public var controlsFullscreen = false
+
+        /// A Boolean value that indicates whether the system zoom slider control is active for the current capture device.
+        ///
+        /// When `true`, the `AVCaptureSystemZoomSlider` has been successfully added to the capture session.
+        /// Per Apple HIG, hide any custom zoom UI (e.g. `CameraZoomBar`) when this is `true`.
+        internal(set) public var isSystemZoomSliderActive = false
         #endif
         
         #if os(iOS)
