@@ -33,7 +33,7 @@ public struct CameraFlipButton<Label: View>: View {
         Button {
             guard let cameraPosition = camera.device.position else { return }
             let newPosition = cameraPosition.flipped
-            
+
             switch camera.device {
                 case _ as BuiltInCamera:
                     camera.device = BuiltInCamera(position: newPosition)
@@ -42,13 +42,22 @@ public struct CameraFlipButton<Label: View>: View {
                 default:
                     return
             }
-            
+
             self.position = newPosition
         } label: {
             label
         }
         .sensoryFeedback(.selection, trigger: position)
         .disabled(!(camera.device is BuiltInCamera || camera.device is WideAngleCamera))
+        .accessibilityLabel(flipAccessibilityLabel)
+    }
+
+    private var flipAccessibilityLabel: String {
+        switch camera.device.position {
+        case .back: "Switch to Front Camera"
+        case .front: "Switch to Rear Camera"
+        case nil: "Switch Camera"
+        }
     }
 }
 

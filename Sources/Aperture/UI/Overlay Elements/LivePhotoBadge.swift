@@ -25,12 +25,14 @@ extension CameraOverlayElement {
                             Text("LIVE")
                                 .foregroundStyle(.black)
                                 .blendMode(.destinationOut)
+                                .accessibilityHidden(true)
                         }
                         .drawingGroup()
                 }
                 .font(.subheadline)
                 .kerning(1)
                 .clipShape(.rect(cornerRadius: 6))
+                .accessibilityLabel("Live Photo")
         }
     }
 }

@@ -77,6 +77,7 @@ struct _FocusTargetBoundingBox: View {
                 }
             }
             .environment(\.layoutDirection, .leftToRight)
+            .accessibilityHidden(true)
     }
     
     private var focusedAreaIndicator: some View {

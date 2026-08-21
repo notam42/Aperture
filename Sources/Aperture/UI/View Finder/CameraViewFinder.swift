@@ -90,8 +90,25 @@ public struct CameraViewFinder: View {
             )
             .clipped()
             .disabled(camera.captureSessionState != .running)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(viewfinderAccessibilityLabel)
+            .accessibilityHint(viewfinderAccessibilityHint)
     }
-    
+
+    private var viewfinderAccessibilityLabel: String {
+        switch camera.captureSessionState {
+        case .running: "Camera viewfinder"
+        case .idle, .configuring: "Camera viewfinder, not active"
+        }
+    }
+
+    private var viewfinderAccessibilityHint: String {
+        var parts: [String] = []
+        if gestures.contains(.zoom) { parts.append("Pinch to zoom") }
+        if gestures.contains(.focus) { parts.append("Tap to focus") }
+        return parts.joined(separator: ", ")
+    }
+
     @ViewBuilder
     private var errorOverlay: some View {
         if let cameraError {

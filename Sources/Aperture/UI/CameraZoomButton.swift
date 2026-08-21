@@ -32,12 +32,17 @@ public struct CameraZoomButton<Label: View>: View {
     }
     
     public var body: some View {
+        let displayFactor = Double(zoomFactor * camera.displayZoomFactorMultiplier)
+        let displayText = displayFactor.formatted(.number.precision(.fractionLength(0...1)))
+
         CameraZoomReader(camera: camera) { proxy in
             Button {
                 proxy.zoom(toVideoZoomFactor: zoomFactor, animation: animation)
             } label: {
                 label
             }
+            .accessibilityLabel("\(displayText)× zoom")
+            .accessibilityHint("Sets zoom to \(displayText)×")
         }
     }
 }

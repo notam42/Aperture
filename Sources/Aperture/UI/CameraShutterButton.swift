@@ -93,6 +93,7 @@ extension CameraShutterButton {
                 ZStack {
                     Circle()
                         .stroke(lineWidth: lineWidth)
+                        .accessibilityHidden(true)
                     Button(action: takePhoto) {
                         Circle()
                             .inset(by: lineWidth * 1.2)
@@ -114,6 +115,8 @@ extension CameraShutterButton {
                                 value: camera.isBusyProcessing
                             )
                     }
+                    .accessibilityLabel(camera.isBusyProcessing ? "Processing photo" : "Take Photo")
+                    .accessibilityHint(camera.isBusyProcessing ? "" : "Captures a photo with the current camera")
                 }
                 .padding(lineWidth / 2) // stroke border would go beyond view bounds
             }
