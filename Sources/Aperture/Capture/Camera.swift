@@ -97,18 +97,18 @@ public final class Camera: Logging {
         guard await Camera.isAccessible else { throw CameraError.permissionDenied }
         guard self.captureSessionState == .idle else { throw CameraError.sessionAlreadStarted }
         
-        Task { @CameraActor in
+        try await Task { @CameraActor in
             try coordinator.configureSession()
             if !coordinator.captureSession.isRunning {
                 coordinator.captureSession.startRunning()
             }
-            
+
             if coordinator.captureSession.isRunning {
-                Task { @MainActor in
+                await MainActor.run {
                     self.captureSessionState = .running
                 }
             }
-        }
+        }.value
     }
     
     /// Stops the session.

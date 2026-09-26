@@ -14,6 +14,7 @@ public struct CameraAdaptiveStackProxy {
     /// A value that describes the accessory stack configuration used to lay out side content.
     public var secondaryLayoutStack: StackConfiguration
     
+    @MainActor
     internal init(interfaceRotationAngle: CGFloat) {
         switch ProcessInfo.processInfo.deviceType {
             case .pad:

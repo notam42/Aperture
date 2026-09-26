@@ -9,6 +9,7 @@ import SwiftUI
 
 extension ProcessInfo {
     /// Queries currently running operating system type.
+    @MainActor
     package var deviceType: DeviceType {
         #if os(macOS)
         DeviceType.mac

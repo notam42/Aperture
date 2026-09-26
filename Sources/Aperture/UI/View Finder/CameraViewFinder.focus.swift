@@ -65,7 +65,7 @@ extension CameraViewFinder {
                     focusGestureState.manualFocusIndicatorPosition = nil
                 }
                 .onReceive(
-                    NotificationCenter.default.publisher(for: .AVCaptureDeviceSubjectAreaDidChange)
+                    NotificationCenter.default.publisher(for: AVCaptureDevice.subjectAreaDidChangeNotification)
                 ) { _ in
                     let coordinator = camera.coordinator
                     Task { @CameraActor in
@@ -150,21 +150,23 @@ extension CameraViewFinder {
                     if isTouching == false {
                         isTouching = true
                         Task { [point = value.location] in
-                            try await Task.sleep(for: .seconds(0.6))
-                            
-                            guard self.isTouching.wrappedValue else { return }
-                            state.manualFocusMode = .manualFocusLocking
-                            state.manualFocusIndicatorPosition = point
-                            state.focus(at: point, camera: session)
-                            
-                            try await Task.sleep(for: .seconds(0.4))
-                            guard self.isTouching.wrappedValue else {
-                                state.manualFocusMode = .manualFocus
-                                session.focusLocked = false
-                                return
-                            }
-                            state.lockFocus(at: point, camera: session)
-                            session.focusLocked = true
+                            do {
+                                try await Task.sleep(for: .seconds(0.6))
+
+                                guard self.isTouching.wrappedValue else { return }
+                                state.manualFocusMode = .manualFocusLocking
+                                state.manualFocusIndicatorPosition = point
+                                state.focus(at: point, camera: session)
+
+                                try await Task.sleep(for: .seconds(0.4))
+                                guard self.isTouching.wrappedValue else {
+                                    state.manualFocusMode = .manualFocus
+                                    session.focusLocked = false
+                                    return
+                                }
+                                state.lockFocus(at: point, camera: session)
+                                session.focusLocked = true
+                            } catch {}
                         }
                     }
                 }

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 /// A view that dynamically switches layout statck based on device context.
 public struct CameraAdaptiveStack<Content: View>: View {
