@@ -34,14 +34,10 @@ public struct CameraAdaptiveStackProxy {
                     secondaryLayoutStack = .init(stack: .vstack, order: secondaryOrder)
                 }
                 
-            case .macCatalyst:
-                fallthrough
-            case .mac:
+            default:
+                // Mac, Mac Catalyst and any other idiom falls back to a regular vertical layout instead of crashing.
                 primaryLayoutStack = .init(stack: .vstack, order: .normal)
                 secondaryLayoutStack = .init(stack: .hstack, order: .normal)
-                
-            default:
-                preconditionFailure("\(Self.self) does not support on platform: \(ProcessInfo.processInfo.deviceType).")
         }
     }
     

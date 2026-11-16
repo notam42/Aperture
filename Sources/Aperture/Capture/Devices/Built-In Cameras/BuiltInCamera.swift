@@ -33,11 +33,8 @@ extension SemanticCamera where Self == BuiltInCamera {
     /// A built-in camera for the default device position.
     @_transparent
     public static var builtInCamera: BuiltInCamera {
-        #if os(iOS)
-        builtInRearCamera
-        #else
-        builtInFrontCamera
-        #endif
+        // `platformDefault` resolves to the front camera on Mac Catalyst, where a rear camera doesn't exist.
+        BuiltInCamera(position: .platformDefault)
     }
     
     /// A built-in camera for a specific device position.

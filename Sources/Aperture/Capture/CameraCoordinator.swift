@@ -71,13 +71,14 @@ public final class CameraCoordinator: NSObject, Logging {
         
         guard let inputDevice = cameraInputDevice else { throw CameraError.invalidCaptureDevice }
         
-        configureSessionInput(device: inputDevice)
+        let activeDevice = configureSessionInput(device: inputDevice)
+        guard activeCameraInput != nil else { throw CameraError.failedToAddInput }
         configureSessionOutputs()
         
         cameraPreview.connect(to: captureSession)
-        cameraPreview.adjustPreview(for: inputDevice)
+        cameraPreview.adjustPreview(for: activeDevice)
         
-        setupRotationCoordinator(for: inputDevice)
+        setupRotationCoordinator(for: activeDevice)
         
         updateOutputServices()
     }
@@ -113,23 +114,38 @@ public final class CameraCoordinator: NSObject, Logging {
             captureSession.sessionPreset = profile.sessionPreset
         }
         
-        configureSessionInput(device: device)
-        cameraPreview.adjustPreview(for: device)
-        setupRotationCoordinator(for: device)
+        let activeDevice = configureSessionInput(device: device)
+        cameraPreview.adjustPreview(for: activeDevice)
+        setupRotationCoordinator(for: activeDevice)
         updateOutputServices()
     }
     
-    private func configureSessionInput(device: AVCaptureDevice) {
+    /// Replaces the session input with the one created from the given device.
+    ///
+    /// - Returns: The device that is actually connected to the session. This is the previous device if the requested one cannot be used.
+    @discardableResult
+    private func configureSessionInput(device requestedDevice: AVCaptureDevice) -> AVCaptureDevice {
         $zoomInformationObservers.cancelAll()
         
+        let device: AVCaptureDevice
         do {
             if let activeCameraInput {
                 captureSession.removeInput(activeCameraInput)
             }
-            self.activeCameraInput = try addInput(from: device)
+            self.activeCameraInput = try addInput(from: requestedDevice)
+            device = requestedDevice
         } catch {
-            if let activeCameraInput {
+            logger.error("Failed to use \(requestedDevice.localizedName) as capture input: \(error.localizedDescription)")
+            
+            guard let activeCameraInput else { return requestedDevice }
+            
+            // Roll back to the previous input and keep the coordinator in sync with the session.
+            if captureSession.canAddInput(activeCameraInput) {
                 captureSession.addInput(activeCameraInput)
+            }
+            device = activeCameraInput.device
+            if cameraInputDevice != device {
+                cameraInputDevice = device // no-op in `didSet` since it matches the active input.
             }
         }
         
@@ -138,7 +154,7 @@ public final class CameraCoordinator: NSObject, Logging {
             displayZoomFactorMultiplier = observeDisplayZoomFactorMultiplier()
         } else {
             let wideAngleCameraZoomFactor = self.wideAngleCameraZoomFactor
-            displayZoomFactorMultiplier = wideAngleCameraZoomFactor
+            displayZoomFactorMultiplier = 1 / wideAngleCameraZoomFactor
             updateCamera { camera in
                 camera.state.displayZoomFactorMultiplier = 1 / wideAngleCameraZoomFactor
             }
@@ -161,6 +177,8 @@ public final class CameraCoordinator: NSObject, Logging {
             configureControls(for: device)
         }
         #endif
+        
+        return device
     }
     
     private func configureSessionOutputs() {
@@ -201,8 +219,8 @@ public final class CameraCoordinator: NSObject, Logging {
                 }
                 
                 let output = _openExistential(service, do: makeOutput(service:))
-                self.activeOutputs.append(output)
                 try addOutput(output)
+                self.activeOutputs.append(output)
             }
         } catch {
             self.activeOutputs.forEach({ captureSession.removeOutput($0) })
@@ -231,7 +249,9 @@ public final class CameraCoordinator: NSObject, Logging {
     @_spi(Internal)
     public var cameraInputDevice: AVCaptureDevice! {
         didSet {
-            guard let cameraInputDevice, activeCameraInput != nil else { return }
+            guard let cameraInputDevice, let activeCameraInput else { return }
+            // The session is already using this device.
+            guard activeCameraInput.device != cameraInputDevice else { return }
             
             do {
                 try switchCaptureDevice(to: cameraInputDevice)
@@ -304,7 +324,7 @@ public final class CameraCoordinator: NSObject, Logging {
             guard let self else { return }
             guard !self.isSettingZoomFactor else { return }
             self.updateCamera { camera in
-                camera.state.zoomFactor = videoZoomFactor
+                camera.state.syncZoomFactorFromDevice(videoZoomFactor)
             }
         }
     }
@@ -406,7 +426,9 @@ public final class CameraCoordinator: NSObject, Logging {
             guard let self else { return }
             Task { @CameraActor [self] in
                 for output in self.activeOutputs {
-                    output.connection(with: .video)?.videoRotationAngle = angle
+                    guard let connection = output.connection(with: .video),
+                          connection.isVideoRotationAngleSupported(angle) else { continue }
+                    connection.videoRotationAngle = angle
                 }
             }
             self.updateCamera {
@@ -422,7 +444,10 @@ public final class CameraCoordinator: NSObject, Logging {
             guard let self else { return }
             self.updateCamera { camera in
                 camera.state.previewRotationAngle = angle
-                self.cameraPreview.preview.videoPreviewLayer.connection?.videoRotationAngle = angle
+                if let connection = self.cameraPreview.preview.videoPreviewLayer.connection,
+                   connection.isVideoRotationAngleSupported(angle) {
+                    connection.videoRotationAngle = angle
+                }
             }
         }
     }
@@ -450,9 +475,9 @@ extension CameraCoordinator {
         perform action: @MainActor @Sendable @escaping (Camera) -> Void
     ) {
         Task { @MainActor [weak self] in
-            guard let self else { return }
-            precondition(self.camera != nil, "Camera is not available.")
-            action(self.camera)
+            // The camera may have been released while this update was in flight.
+            guard let self, let camera = self.camera else { return }
+            action(camera)
         }
     }
 

@@ -19,6 +19,8 @@ final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, Loggi
     let dataRepresentationCustomizer: (any PhotoFileDataRepresentationCustomizer)?
     
     private var capturedPhoto = CapturedPhoto()
+    /// The first error reported while processing the photo.
+    private var processingError: (any Error)?
     
     init(
         camera: Camera,
@@ -58,6 +60,7 @@ final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, Loggi
     ) {
         if let error {
             logger.error("There is an error when finishing processing photo: \(error.localizedDescription)")
+            processingError = processingError ?? error
             return
         }
         
@@ -99,7 +102,8 @@ final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, Loggi
         resolvedSettings: AVCaptureResolvedPhotoSettings
     ) {
         Task { @MainActor in
-            camera.state.inProgressLivePhotoCount -= 1
+            // The state may have been reset (e.g. session stopped) while the movie was recording.
+            camera.state.inProgressLivePhotoCount = max(0, camera.state.inProgressLivePhotoCount - 1)
         }
     }
     
@@ -124,6 +128,7 @@ final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, Loggi
     ) {
         if let error {
             logger.error("There is an error when finishing capturing deferred photo: \(error.localizedDescription)")
+            processingError = processingError ?? error
             return
         }
         
@@ -150,7 +155,9 @@ final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate, Loggi
         }
         
         guard capturedPhoto.isValid else {
-            continuation.resume(throwing: PhotoCaptureError.noPhotoData)
+            // Surface the underlying failure instead of a generic one.
+            let failure: any Error = error ?? processingError ?? (PhotoCaptureError.noPhotoData as any Error)
+            continuation.resume(throwing: failure)
             return
         }
         

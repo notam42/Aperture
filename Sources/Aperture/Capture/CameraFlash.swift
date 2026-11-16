@@ -30,7 +30,7 @@ public struct CameraFlash: Hashable, Sendable {
             case .auto:
                 isFlashRecommendedByScene
             @unknown default:
-                fatalError("Unknown flash mode")
+                false
         }
     }
 }

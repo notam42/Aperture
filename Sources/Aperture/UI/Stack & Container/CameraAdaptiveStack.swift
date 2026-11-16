@@ -28,7 +28,8 @@ public struct CameraAdaptiveStack<Content: View>: View {
     }
     
     @State private var fallbackRotationAngle: CGFloat = 90 // default to potrait mode
-    @Cancellables private var interfaceOrientationObservers
+    // Stored in `State` so the observation survives re-creations of this view value by its parent.
+    @State private var interfaceOrientationObservers = Cancellables()
     
     public var body: some View {
         let cameraLayoutProxy = CameraAdaptiveStackProxy(
@@ -45,7 +46,7 @@ public struct CameraAdaptiveStack<Content: View>: View {
         }
         #if canImport(UIKit)
         .onChange(of: camera.previewRotationAngle == nil, initial: true) {
-            $interfaceOrientationObservers.cancelAll()
+            interfaceOrientationObservers.cancelAll()
             
             let usesFallback = camera.previewRotationAngle == nil
             if usesFallback {
@@ -67,7 +68,7 @@ public struct CameraAdaptiveStack<Content: View>: View {
         withValueObservation(
             of: scene,
             keyPath: \.effectiveGeometry,
-            cancellables: &interfaceOrientationObservers
+            cancellables: &interfaceOrientationObservers.wrappedValue
         ) {
             fallbackRotationAngle = switch $0.interfaceOrientation {
                 case .portraitUpsideDown:

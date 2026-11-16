@@ -78,12 +78,24 @@ extension Camera {
         public var zoomFactor: CGFloat = 1.0 {
             didSet {
                 guard oldValue != self.zoomFactor else { return }
+                // The value comes from the device itself, writing it back would fight with ongoing zoom ramps (e.g. system zoom slider).
+                guard !isSyncingZoomFactorFromDevice else { return }
                 let updatedZoomFactor = self.zoomFactor
                 
                 Task { @MainActor [weak self] in
                     self?.applyZoomFactor(updatedZoomFactor)
                 }
             }
+        }
+        
+        @ObservationIgnored
+        private var isSyncingZoomFactorFromDevice = false
+        
+        /// Mirrors the zoom factor reported by the capture device without applying it back to the device.
+        internal func syncZoomFactorFromDevice(_ zoomFactor: CGFloat) {
+            isSyncingZoomFactorFromDevice = true
+            defer { isSyncingZoomFactorFromDevice = false }
+            self.zoomFactor = zoomFactor
         }
         
         private func applyZoomFactor(_ zoomFactor: CGFloat) {
@@ -94,7 +106,19 @@ extension Camera {
                 defer { camera.coordinator.isSettingZoomFactor = false }
                 
                 camera.coordinator.withCurrentCaptureDevice { device in
-                    device.videoZoomFactor = zoomFactor
+                    // Setting a zoom factor out of the supported range raises an exception.
+                    let supportedZoomFactor = min(
+                        max(zoomFactor, device.minAvailableVideoZoomFactor),
+                        device.maxAvailableVideoZoomFactor
+                    )
+                    device.videoZoomFactor = supportedZoomFactor
+                    
+                    if supportedZoomFactor != zoomFactor {
+                        Task { @MainActor in
+                            guard camera.state.zoomFactor == zoomFactor else { return }
+                            camera.state.syncZoomFactorFromDevice(supportedZoomFactor)
+                        }
+                    }
                 }
             }
         }

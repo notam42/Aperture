@@ -27,7 +27,12 @@ public final class Camera: Logging {
             _cameraSwitchingTask?.cancel()
             _cameraSwitchingTask = Task { @CameraActor in
                 try await Task.sleep(for: .seconds(0.2))
-                coordinator.cameraInputDevice = newValue.captureDevice
+                guard let captureDevice = newValue.captureDevice else {
+                    // Keep the current input, otherwise the session and the coordinator would go out of sync.
+                    self.logger.error("The capture device of \(String(describing: newValue)) is not available.")
+                    return
+                }
+                coordinator.cameraInputDevice = captureDevice
             }
         }
     }
@@ -70,24 +75,20 @@ public final class Camera: Logging {
         
         let coordinator = CameraCoordinator(configuration: profile)
         self.coordinator = coordinator
-        defer {
-            let captureDevice = device.captureDevice
-            Task { @CameraActor in
-                await MainActor.run {
-                    self.coordinator.camera = self
-                }
-                coordinator.cameraInputDevice = captureDevice
-            }
-        }
-        
         self.state = State(camera: nil)
-        defer {
-            Task { @MainActor in
-                self.state.camera = self
-            }
+        
+        // This is enqueued on the serial `CameraActor` before any subsequent call (e.g. `startRunning()`),
+        // which guarantees the input device is set before the session gets configured.
+        let captureDevice = device.captureDevice
+        Task { @CameraActor in
+            coordinator.cameraInputDevice = captureDevice
         }
         
         self._automaticCameraObserver = AutomaticCameraObserver(camera: self)
+        
+        // Wire up back references synchronously, so they are in place before any scheduled work runs.
+        self.state.camera = self
+        coordinator.camera = self
     }
     
     // MARK: - Session Management
@@ -140,18 +141,24 @@ public final class Camera: Logging {
     ) {
         Task { @CameraActor in
             coordinator.withCurrentCaptureDevice { device in
-                guard device.isFocusPointOfInterestSupported,
+                // Fixed-focus cameras (e.g. some front cameras) can still expose at a point of interest.
+                guard device.isFocusPointOfInterestSupported ||
                       device.isExposurePointOfInterestSupported else {
                     self.logger.warning("Current device doesn't support focusing or exposing point of interst.")
                     return
                 }
-                device.focusPointOfInterest = pointOfInterest
+                
+                if device.isFocusPointOfInterestSupported {
+                    device.focusPointOfInterest = pointOfInterest
+                }
                 if device.isFocusModeSupported(focusMode) {
                     device.focusMode = focusMode
                 }
                 
                 device.setExposureTargetBias(Float.zero)
-                device.exposurePointOfInterest = pointOfInterest
+                if device.isExposurePointOfInterestSupported {
+                    device.exposurePointOfInterest = pointOfInterest
+                }
                 if device.isExposureModeSupported(exposureMode) {
                     device.exposureMode = exposureMode
                 }
@@ -200,6 +207,12 @@ fileprivate extension Camera {
                 options: [.new],
                 context: nil
             )
+        }
+        
+        deinit {
+            // The observer is owned by the camera, unregister it so KVO never messages a deallocated object.
+            AVCaptureDevice.self.removeObserver(self, forKeyPath: "systemPreferredCamera")
+            AVCaptureDevice.self.removeObserver(self, forKeyPath: "userPreferredCamera")
         }
 
         public override func observeValue(

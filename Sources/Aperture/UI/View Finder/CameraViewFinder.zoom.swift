@@ -26,7 +26,10 @@ extension CameraViewFinder {
         }
         private var maxZoomFactor: CGFloat {
             #if os(iOS)
-            5.0 * CGFloat(truncating: device?.captureDevice?.virtualDeviceSwitchOverVideoZoomFactors.last ?? 1)
+            min(
+                5.0 * CGFloat(truncating: device?.captureDevice?.virtualDeviceSwitchOverVideoZoomFactors.last ?? 1),
+                device?.captureDevice?.maxAvailableVideoZoomFactor ?? .greatestFiniteMagnitude
+            )
             #else
             1
             #endif

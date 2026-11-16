@@ -93,13 +93,13 @@ public struct _FitAspectRatioViewModifier: ViewModifier {
             safeAreaInsetsIgnoredSize.width += safeAreaInsets.leading
         }
         if ignoreSafeAreaEdges.contains(.bottom) {
-            safeAreaInsetsIgnoredSize.width += safeAreaInsets.bottom
+            safeAreaInsetsIgnoredSize.height += safeAreaInsets.bottom
         }
         if ignoreSafeAreaEdges.contains(.trailing) {
             safeAreaInsetsIgnoredSize.width += safeAreaInsets.trailing
         }
         if ignoreSafeAreaEdges.contains(.top) {
-            safeAreaInsetsIgnoredSize.width += safeAreaInsets.top
+            safeAreaInsetsIgnoredSize.height += safeAreaInsets.top
         }
         let currentAspectRatio = safeAreaInsetsIgnoredSize.width / safeAreaInsetsIgnoredSize.height
         

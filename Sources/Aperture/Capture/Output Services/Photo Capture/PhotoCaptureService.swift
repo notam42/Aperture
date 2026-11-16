@@ -30,6 +30,12 @@ public struct PhotoCaptureService: OutputService, Logging {
         Coordinator()
     }
     
+    public static func == (lhs: PhotoCaptureService, rhs: PhotoCaptureService) -> Bool {
+        // Two services are interchangeable when they request the same options.
+        // (Reference-typed implementation details must not participate in the comparison.)
+        lhs.options == rhs.options
+    }
+    
     public func makeOutput(context: Context) -> AVCapturePhotoOutput {
         let output = AVCapturePhotoOutput()
         output.maxPhotoQualityPrioritization = .quality
@@ -100,8 +106,8 @@ public struct PhotoCaptureService: OutputService, Logging {
         
         func setFlashScene(_ isFlashScene: Bool) {
             Task { @MainActor in
-                precondition(cameraCoordinator != nil, "CameraCoordinator must not equal to nil")
-                cameraCoordinator?.camera.state.flash.isFlashRecommendedByScene = isFlashScene
+                // The camera may have been released while the observation was in flight.
+                cameraCoordinator?.camera?.state.flash.isFlashRecommendedByScene = isFlashScene
             }
         }
     }
@@ -136,22 +142,19 @@ extension PhotoCaptureService {
             photoSettings = AVCapturePhotoSettings(format: format)
         }
          
-        var dimensions: CMVideoDimensions! = context.inputDevice.activeFormat
-            .supportedMaxPhotoDimensions
-            .first(where: {
-                $0.width * $0.height > configuration.preferredResolution._minimumPixelCount
-            })
-        if dimensions == nil {
-            let maximumSupportedPhotoDimensions = context.inputDevice
-                .activeFormat
-                .supportedMaxPhotoDimensions.last
-            precondition(maximumSupportedPhotoDimensions != nil, "Video device must support at least one max photo dimensions.")
-            
-            logger.warning("Current capture device does not support \(configuration.preferredResolution.description). Fall back to the maximum dimensions supported by the device: \(maximumSupportedPhotoDimensions!.width)x\(maximumSupportedPhotoDimensions!.height)")
-            dimensions = maximumSupportedPhotoDimensions!
+        let supportedMaxPhotoDimensions = context.inputDevice.activeFormat.supportedMaxPhotoDimensions
+        var dimensions = supportedMaxPhotoDimensions.first(where: {
+            Int($0.width) * Int($0.height) > Int(configuration.preferredResolution._minimumPixelCount)
+        })
+        if dimensions == nil, let maximumSupportedPhotoDimensions = supportedMaxPhotoDimensions.last {
+            logger.warning("Current capture device does not support \(configuration.preferredResolution.description). Fall back to the maximum dimensions supported by the device: \(maximumSupportedPhotoDimensions.width)x\(maximumSupportedPhotoDimensions.height)")
+            dimensions = maximumSupportedPhotoDimensions
         }
         
-        photoSettings.maxPhotoDimensions = dimensions
+        // Leave the default value untouched if the device does not report any dimensions.
+        if let dimensions {
+            photoSettings.maxPhotoDimensions = dimensions
+        }
         
         setPhotoQualityPrioritizationIfSupported(
             configuration.qualityPrioritization,
@@ -166,13 +169,20 @@ extension PhotoCaptureService {
         }
         #endif
         #if os(iOS)
-        photoSettings.livePhotoMovieFileURL = configuration.capturesLivePhoto ? URL.movieFileURL : nil
+        if configuration.capturesLivePhoto {
+            // Requesting a Live Photo when the output is not eligible for it raises an exception.
+            if output.isLivePhotoCaptureEnabled && photoSettings.rawPhotoPixelFormatType == 0 {
+                photoSettings.livePhotoMovieFileURL = URL.movieFileURL
+            } else {
+                logger.warning("[Live Photo] Live Photo capture is unavailable for current device or configuration. Fallback to deliver a still photo.")
+            }
+        }
         photoSettings.isDepthDataDeliveryEnabled = output.isDepthDataDeliveryEnabled
         photoSettings.isPortraitEffectsMatteDeliveryEnabled = output.isPortraitEffectsMatteDeliveryEnabled
         #endif
         
-        let flash = await context.coordinator.cameraCoordinator.camera.state.flash
-        if output.supportedFlashModes.contains(flash.userSelectedMode) {
+        let flash = await context.coordinator.cameraCoordinator?.camera?.state.flash
+        if let flash, output.supportedFlashModes.contains(flash.userSelectedMode) {
             photoSettings.flashMode = flash.userSelectedMode
         }
         

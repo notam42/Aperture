@@ -70,8 +70,13 @@ extension CameraViewFinder {
                     let coordinator = camera.coordinator
                     Task { @CameraActor in
                         coordinator.withCurrentCaptureDevice { device in
-                            device.focusMode = .continuousAutoFocus
-                            device.exposureMode = .continuousAutoExposure
+                            // Setting an unsupported mode raises an exception (e.g. fixed-focus cameras).
+                            if device.isFocusModeSupported(.continuousAutoFocus) {
+                                device.focusMode = .continuousAutoFocus
+                            }
+                            if device.isExposureModeSupported(.continuousAutoExposure) {
+                                device.exposureMode = .continuousAutoExposure
+                            }
                             device.setExposureTargetBias(.zero)
                             device.isSubjectAreaChangeMonitoringEnabled = false
                         }

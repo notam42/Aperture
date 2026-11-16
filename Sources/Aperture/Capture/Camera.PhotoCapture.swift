@@ -31,7 +31,15 @@ extension Camera {
             return (photoOutput, photoSettings)
         }()
 
-        let capturedPhoto = try await withPhotoOutputReadinessCoordinatorTracking(
+        let captureID = photoSettings.uniqueID
+        defer {
+            // Always release the delegate, even if the capture fails.
+            Task { @MainActor in
+                self.inFlightPhotoCaptureDelegates[captureID] = nil
+            }
+        }
+
+        return try await withPhotoOutputReadinessCoordinatorTracking(
             output: photoOutput,
             photoSettings: photoSettings
         ) {
@@ -42,18 +50,12 @@ extension Camera {
                     continuation: continuation
                 )
                 Task { @MainActor in
-                    self.inFlightPhotoCaptureDelegates[photoSettings.uniqueID] = delegate
+                    self.inFlightPhotoCaptureDelegates[captureID] = delegate
                 }
 
                 photoOutput.capturePhoto(with: photoSettings, delegate: delegate)
             }
         }
-
-        Task { @MainActor in
-            self.inFlightPhotoCaptureDelegates[photoSettings.uniqueID] = nil
-        }
-
-        return capturedPhoto
     }
     
     nonisolated private func withPhotoOutputReadinessCoordinatorTracking<T>(

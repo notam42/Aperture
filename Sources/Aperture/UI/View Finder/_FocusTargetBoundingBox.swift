@@ -59,7 +59,7 @@ struct _FocusTargetBoundingBox: View {
                         .padding(-32)
                         .opacity(0.001)
                         .onAppear {
-                            let previewWidth = proxy.bounds(of: .named("PREVIEW"))!.size.width
+                            guard let previewWidth = proxy.bounds(of: .named("PREVIEW"))?.size.width else { return }
                             let trailingEdgeX = proxy.frame(in: .named("PREVIEW")).maxX
                             if trailingEdgeX + 36 > previewWidth {
                                 self.exposureBiasSide = .left
@@ -186,15 +186,21 @@ struct _FocusTargetBoundingBox: View {
                     }
                     self.exposureY = max(-37.5, min(37.5, self.lastExposureY + $0))
                     let ev = -self.exposureY / 37.5 * 3.0
-                    device.exposureMode = .autoExpose
-                    device.setExposureTargetBias(Float(ev))
+                    if device.isExposureModeSupported(.autoExpose) {
+                        device.exposureMode = .autoExpose
+                    }
+                    // Setting a bias out of the supported range raises an exception.
+                    let bias = min(max(Float(ev), device.minExposureTargetBias), device.maxExposureTargetBias)
+                    device.setExposureTargetBias(bias)
                 } catch {
                     camera.coordinator.logger.error("Cannot lock device for configuration: \(error.localizedDescription)")
                 }
             }
             .onEnded { _ in
                 updateFocusIndicator()
-                camera.device.captureDevice?.unlockForConfiguration()
+                if isUnlocked {
+                    camera.device.captureDevice?.unlockForConfiguration()
+                }
                 self.isUnlocked = false
                 self.lastExposureY = self.exposureY
             }
